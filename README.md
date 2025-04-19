@@ -1,2 +1,2 @@
 # CodexMCP
-MCP that wraps Codex CLI and Claude Code
+MCP that wraps OpenAI Codex CLI
