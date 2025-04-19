@@ -33,22 +33,29 @@ python -m codexMCP.server
 # Install the reference CLI if you don't have it yet
 pip install --upgrade mcp-cli
 
-# List available tools
-mcp-cli chat --server CodexMCP -- list_tools
+# Inspect the server and list tools
+mcp-cli inspect --server CodexMCP
 
-# Generate Rust code that prints "hello world"
-mcp-cli chat --server CodexMCP -- call generate_code "hello world" --language Rust
+# Or start an interactive chat and type `/tools` then `/call generate_code …`
+
+# One‑shot Rust code generation via *inspect* utility
+mcp-cli inspect --server CodexMCP --call generate_code --json '{"description":"hello world","language":"Rust"}'
 ```
 
 ### Talk to the server with *Claude Code*
 
 ```bash
 # One‑time registration
-claude mcp add CodexMCP --endpoint "stdio"
+claude mcp add CodexMCP \
+  --cmd python -m codexMCP.server \
+  -e OPENAI_API_KEY
 
 # Usage inside a chat with Claude ↴
 
-User > mcp__CodexMCP__generate_code("web server that returns 'pong'", "Go")
+User > mcp__CodexMCP__generate_code({
+  "description": "web server that returns 'pong'",
+  "language": "Go"
+})
 ```
 
 ---

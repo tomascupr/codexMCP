@@ -27,6 +27,7 @@ class CodexPipe:
 
     _CMD = [
         "codex",
+        "--quiet",  # minimise any banner / progress noise on stdout
         "--json",
         "--pipe",
         "--approval-mode=full-auto",
@@ -75,8 +76,9 @@ class CodexPipe:
                 try:
                     raw = await asyncio.wait_for(self._process.stdout.readline(), timeout=2.0)
                 except asyncio.TimeoutError:
-                    # Emit progress every 10 seconds of silence.
-                    if ctx is not None and time.monotonic() - last_progress >= 10.0:
+                    # Emit progress every 5 seconds of silence so clients
+                    # do not mis‑interpret long‑running generations as timeouts.
+                    if ctx is not None and time.monotonic() - last_progress >= 5.0:
                         # The MCP SDK expects *await*able progress calls.
                         try:
                             await ctx.progress("still working")  # type: ignore[attr-defined]
