@@ -1,0 +1,10 @@
+[run]
+omit =
+    codexMCP/pipe.py
+    codexMCP/server.py
+    codexMCP/logging_cfg.py
+
+[report]
+exclude_lines =
+    # pragma: no cover
+    if __name__ == .__main__.:    

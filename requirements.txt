@@ -1,0 +1,5 @@
+modelcontextprotocol>=0.6
+python-dotenv
+pytest
+pytest-asyncio
+rich
