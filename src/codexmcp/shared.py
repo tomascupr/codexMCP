@@ -6,25 +6,32 @@ import os
 import sys
 
 # Add project root to path early for imports
-_PROJECT_ROOT = os.path.dirname(__file__) or "."
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) or "."
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 # Load environment variables from .env file first
 from dotenv import load_dotenv
 
-# Construct the absolute path to the .env file
-_dotenv_path = os.path.join(_PROJECT_ROOT, '.env')
+# Try loading .env from current working directory first, then package directory
+_dotenv_paths = [
+    os.path.join(os.getcwd(), '.env'),  # Current working directory
+    os.path.join(_PROJECT_ROOT, '.env'),  # Project root
+]
 
-# Load the .env file if it exists
-if os.path.exists(_dotenv_path):
-    load_dotenv(dotenv_path=_dotenv_path)
-    print(f"Loaded .env file from: {_dotenv_path}") # Add print statement
-else:
-    print(f".env file not found at: {_dotenv_path}") # Add print statement
+_env_loaded = False
+for _dotenv_path in _dotenv_paths:
+    if os.path.exists(_dotenv_path):
+        load_dotenv(dotenv_path=_dotenv_path)
+        print(f"Loaded .env file from: {_dotenv_path}")
+        _env_loaded = True
+        break
+
+if not _env_loaded:
+    print("Warning: No .env file found in current directory or project root")
 
 from fastmcp import FastMCP
-from logging_cfg import logger # Import logger here as well
+from logging_cfg import logger
 from pipe import CodexPipe
 
 # ---------------------------------------------------------------------------

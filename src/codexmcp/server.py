@@ -48,8 +48,8 @@ def _ensure_event_loop_policy() -> None:
         if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):  # type: ignore[attr-defined]
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # type: ignore[attr-defined]
 
-
-if __name__ == "__main__":
+def main() -> None:
+    """Main entry point for the CodexMCP server."""
     _ensure_event_loop_policy()
     logger.info("CodexMCP server starting … PID=%s", os.getpid())
 
@@ -79,10 +79,12 @@ if __name__ == "__main__":
 
     except ImportError as e_import:
         logger.error("Failed to import tools module: %s", e_import, exc_info=True)
-        # Decide if server should run without tools
+        sys.exit(1)
     except Exception as e_main:
         logger.error("Error in server main execution: %s", str(e_main), exc_info=True)
-        # Consider exiting if error is critical
-        # sys.exit(1)
+        sys.exit(1)
     finally:
         logger.info("CodexMCP server shutting down.")
+
+if __name__ == "__main__":
+    main()
