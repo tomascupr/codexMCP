@@ -41,13 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved `.env` loading to check current directory first and warned if missing
 - Resolved `ImportError` issues for `logging_cfg`, `shared`, and `tools` modules
 
-## [0.1.2] - YYYY-MM-DD
+## [0.1.2] - 2025-04-20
 
 ### Added
 
 - Setup for PyPI publishing using `build` and `twine`.
-- Configured `.pypirc` for token authentication.
-
-### Changed
-
-- Updated `README.md` with PyPI installation instructions. 
+- Configured `.pypirc`
