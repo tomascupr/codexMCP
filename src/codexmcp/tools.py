@@ -39,8 +39,17 @@ async def generate_code(ctx: Context, description: str, language: str = "Python"
     """Generate *language* source code that fulfils *description*."""
 
     prompt = (
-        f"# Task\nGenerate {language} code that fulfils the following requirement:\n"
-        f"{description}\n\n# Provide only the source code without explanations."
+        f"# Task: Code Generation\n"
+        f"You are an expert {language} developer tasked with implementing the following:\n\n"
+        f"## Requirements\n{description}\n\n"
+        f"## Guidelines\n"
+        f"- Focus on readability, efficiency, and best practices for {language}\n"
+        f"- Include appropriate error handling\n"
+        f"- Use descriptive variable/function names\n"
+        f"- Follow established {language} conventions and idioms\n"
+        f"- Write maintainable, well-structured code\n\n"
+        f"## Output Format\n"
+        f"Provide only the source code without explanations or comments beyond what's necessary for code documentation."
     )
 
     return await _query_codex(ctx, prompt, model=model)
@@ -51,9 +60,18 @@ async def refactor_code(ctx: Context, code: str, instruction: str, model: str = 
     """Refactor *code* as per *instruction*."""
 
     prompt = (
-        "# Original code\n" + code.strip() + "\n\n" +
-        "# Refactor instruction\n" + instruction.strip() + "\n\n" +
-        "# Refactored code (output only the code)"
+        "# Task: Code Refactoring\n"
+        "You are a software architect specializing in clean code and software design principles.\n\n"
+        "## Original Code\n" + code.strip() + "\n\n" +
+        "## Refactoring Goal\n" + instruction.strip() + "\n\n" +
+        "## Refactoring Guidelines\n"
+        "- Preserve all functionality and behavior\n"
+        "- Improve code readability and maintainability\n"
+        "- Apply established design patterns where appropriate\n"
+        "- Follow language best practices and conventions\n"
+        "- Maintain or improve performance where possible\n\n"
+        "## Output Format\n"
+        "Provide only the refactored code. Do not include explanations."
     )
 
     return await _query_codex(ctx, prompt, model=model)
@@ -64,9 +82,72 @@ async def write_tests(ctx: Context, code: str, description: str = "", model: str
     """Generate unit tests for *code*."""
 
     prompt = (
-        "# Code under test\n" + code.strip() + "\n\n" +
-        (f"# Additional context\n{description}\n\n" if description else "") +
-        "# Write thorough unit tests in the same language. Return only the test code."
+        "# Task: Test Development\n"
+        "You are a QA engineer with expertise in test-driven development.\n\n"
+        "## Code Under Test\n" + code.strip() + "\n\n" +
+        (f"## Additional Context\n{description}\n\n" if description else "") +
+        "## Testing Requirements\n"
+        "- Write comprehensive unit tests covering all major functionality\n"
+        "- Include edge cases and error scenarios\n"
+        "- Follow standard testing patterns and libraries for the language\n"
+        "- Aim for high code coverage\n"
+        "- Include setup/teardown as needed\n\n"
+        "## Output Format\n"
+        "Provide only the test code. Do not include explanations outside of necessary test documentation."
     )
 
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def explain_code(ctx: Context, code: str, detail_level: str = "medium", model: str = "o4-mini") -> str:
+    """Explain the functionality and structure of the provided *code*.
+    
+    The *detail_level* can be 'brief', 'medium', or 'detailed'.
+    """
+    
+    prompt = (
+        "# Task: Code Explanation\n"
+        f"You are a technical educator tasked with explaining code to {detail_level} level of detail.\n\n"
+        "## Code to Explain\n" + code.strip() + "\n\n" +
+        f"## Explanation Guidelines for '{detail_level}' Detail Level\n" +
+        "- Brief: Provide a concise 2-3 sentence high-level overview of what the code does\n" +
+        "- Medium: Explain main functions/classes and their purposes, key algorithms, and overall structure\n" +
+        "- Detailed: Provide comprehensive breakdown of all components, logic flows, design patterns, and potential edge cases\n\n"
+        "## Focus Areas\n" +
+        "- Overall purpose and functionality\n" +
+        "- Key algorithms and data structures\n" +
+        "- Control flow and execution path\n" +
+        "- Important design patterns or techniques used\n" +
+        "- Potential performance considerations or limitations"
+    )
+    
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", model: str = "o4-mini") -> str:
+    """Generate documentation for the provided *code*.
+    
+    The *doc_format* can be 'docstring', 'markdown', or 'html'.
+    """
+    
+    prompt = (
+        "# Task: Documentation Generation\n"
+        "You are a technical writer creating professional documentation for code.\n\n"
+        "## Code to Document\n" + code.strip() + "\n\n" +
+        f"## Documentation Format: {doc_format}\n" +
+        "- docstring: Generate language-appropriate docstrings embedded in the code\n" +
+        "- markdown: Create standalone markdown documentation with sections for classes, functions, usage examples\n" +
+        "- html: Produce HTML documentation with proper structure, highlighting, and navigation\n\n" +
+        "## Documentation Requirements\n" +
+        "- Clearly describe all functions, classes, and methods\n" +
+        "- Document parameters, return types, and exceptions\n" +
+        "- Include usage examples for key components\n" +
+        "- Specify any important dependencies or requirements\n" +
+        "- Follow best practices for the specified documentation format\n\n" +
+        "## Output Format\n" +
+        "Provide only the documentation without any additional explanations."
+    )
+    
     return await _query_codex(ctx, prompt, model=model)

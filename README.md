@@ -9,6 +9,8 @@ Tools exposed by this server (all asynchronous):
 1. `generate_code(description, language="Python", model="o4-mini")`
 2. `refactor_code(code, instruction, model="o4-mini")`
 3. `write_tests(code, description="", model="o4-mini")`
+4. `explain_code(code, detail_level="medium", model="o4-mini")`
+5. `generate_docs(code, doc_format="docstring", model="o4-mini")`
 
 Everything that the Codex subprocess prints (stdout **and** stderr) is recorded
 to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
@@ -25,14 +27,7 @@ to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
 npm install -g @openai/codex
 ```
 
-2. Create a Python 3.10+ virtual environment and activate it:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-3. Create a `.env` file in your working directory:
+2. Create a `.env` file in your working directory:
 
 ```ini
 OPENAI_API_KEY=sk-<your-key>
@@ -84,6 +79,10 @@ that each call returns in ~0.5‑1.5 s.
 # Ask Codex to write a Rust hello-world program
 mcp-cli chat --server CodexMCP -q \
     'mcp__CodexMCP__generate_code("hello world", "Rust")'
+
+# Get an explanation of code
+mcp-cli chat --server CodexMCP -q \
+    'mcp__CodexMCP__explain_code("def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)", "brief")'
 ```
 
 ### API examples

@@ -47,3 +47,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Setup for PyPI publishing using `build` and `twine`.
 - Configured `.pypirc`
+
+## [0.1.3] - 2025-04-21
+
+### Added
+
+- Two new tools:
+  - `explain_code`: Explains code at various detail levels ("brief", "medium", "detailed")
+  - `generate_docs`: Generates documentation in different formats ("docstring", "markdown", "html")
+
+### Changed
+
+- Enhanced all tool prompts with:
+  - Role-playing elements (e.g., "You are an expert developer...")
+  - Specific guidelines for quality, formatting, and edge cases
+  - Improved structure with clear sections
+  - More detailed instructions for better outputs
