@@ -17,31 +17,61 @@ to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
 
 ## Installation (Linux/macOS)
 
-The helper script below installs Node 18 LTS, the Codex CLI, creates a Python
-3.10 `venv` and installs the required PyPI packages.
+### Prerequisites
+
+1. Install Node 18 LTS and the Codex CLI globally:
 
 ```bash
-git clone <repo-url> codexmcp
-cd codexmcp
-
-# Needs sudo for the Node 18 APT repo – omit if Node 18 LTS is already present.
-./setup.sh
-
-# ➊ Create an OpenAI API key and place it in a .env file:
-# Create a file named .env in the project root with the following content:
-# OPENAI_API_KEY=sk-<your-key>
-# Note: .env is already in .gitignore
-
-# ➋ Activate the virtual-env for the current shell (*optional* - convenience)
-source .venv/bin/activate
-
-# ➌ Run the server (responds on stdin/stdout)
-python server.py
+npm install -g @openai/codex
 ```
 
-The server now loads the `OPENAI_API_KEY` from the `.env` file automatically.
+2. Create a Python 3.10+ virtual environment and activate it:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+3. Create a `.env` file in your working directory:
+
+```ini
+OPENAI_API_KEY=sk-<your-key>
+```
+
+### Install CodexMCP
+
+Install directly from GitHub:
+
+```bash
+pip install "git+https://github.com/tomascupr/codexMCP.git#egg=codexmcp"
+```
+
+Or, if published to PyPI (future):
+
+```bash
+pip install codexmcp
+```
+
+---
+
+## Running the server
+
+Once installed, you can start the server in one of two ways:
+
+- Using the console script:
+
+  ```bash
+  codexmcp
+  ```
+
+- Using Python's module mode:
+
+  ```bash
+  python -m codexmcp.server
+  ```
+
 The first request may take a couple of seconds while the model warms up; after
-that each call returns in ~0.5‑1.5 s.
+that each call returns in ~0.5‑1.5 s.
 
 ---
 
@@ -49,7 +79,7 @@ that each call returns in ~0.5‑1.5 s.
 
 ```bash
 # List available tools (smoke-test: should answer <2 s)
-mcp-cli chat --server CodexMCP -q '["list_tools"]'
+ mcp-cli chat --server CodexMCP -q '["list_tools"]'
 
 # Ask Codex to write a Rust hello-world program
 mcp-cli chat --server CodexMCP -q \
@@ -72,10 +102,10 @@ mcp-cli chat --server CodexMCP -q \
 
 ## Troubleshooting
 
-• `codex: command not found` → run `npm i -g @openai/codex`, ensure
-  npm's *global* bin directory is on `$PATH`.
+• `codex: command not found` → ensure npm's global bin directory is on `$PATH`.
+• `.env` warnings → make sure your `.env` file is in your working directory.
 • Logs not written → check permissions for `~/.codexmcp`.
-• Long delay before first answer → normal, model container has to warm-up.
+• Long delay before first answer → normal, model container has to warm up.
 
 ---
 
