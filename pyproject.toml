@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codexmcp"
+version = "0.1.0"
+authors = [
+    { name = "Tomas Cupr", email = "work@tomcupr.com" }
+]
+description = "Minimal FastMCP server that wraps the OpenAI Codex CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp",
+    "python-dotenv",
+    "rich",
+]
+urls = { "Homepage" = "https://github.com/tomascupr/codexmcp" } 
