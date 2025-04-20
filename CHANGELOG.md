@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two new tools:
   - `explain_code`: Explains code at various detail levels ("brief", "medium", "detailed")
   - `generate_docs`: Generates documentation in different formats ("docstring", "markdown", "html")
+- Comprehensive test suite:
+  - Unit tests for all core modules (tools, pipe, server, shared)
+  - Test fixtures and configurations
+  - Coverage reporting setup
+  - Testing documentation in README
 
 ### Changed
 
@@ -63,3 +68,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Specific guidelines for quality, formatting, and edge cases
   - Improved structure with clear sections
   - More detailed instructions for better outputs
+- Added pytest configuration in pyproject.toml
+- Updated requirements.txt with test dependencies

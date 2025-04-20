@@ -24,3 +24,12 @@ include = ["codexmcp*"]
 
 [project.scripts]
 codexmcp = "codexmcp.server:main" 
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/codexmcp"]
+omit = ["tests/*"]

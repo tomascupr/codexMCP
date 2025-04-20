@@ -106,6 +106,24 @@ mcp-cli chat --server CodexMCP -q \
 • Logs not written → check permissions for `~/.codexmcp`.
 • Long delay before first answer → normal, model container has to warm up.
 
+## Testing
+
+Run the test suite with pytest:
+
+```bash
+# Install test dependencies
+pip install -r requirements.txt
+
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov=codexmcp
+
+# Run specific test file
+pytest tests/test_tools.py
+```
+
 ---
 
 ## License
