@@ -7,8 +7,8 @@ from typing import Any
 
 from fastmcp import Context, exceptions
 
-from logging_cfg import logger
-from shared import mcp, pipe
+from .logging_cfg import logger
+from .shared import mcp, pipe
 
 
 async def _query_codex(ctx: Context, prompt: str, *, model: str = "o4-mini") -> str:

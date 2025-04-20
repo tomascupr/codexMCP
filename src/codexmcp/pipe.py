@@ -15,7 +15,7 @@ import threading
 from subprocess import PIPE, Popen
 from typing import Any, Callable, Optional
 
-from logging_cfg import logger
+from .logging_cfg import logger
 
 # Strip ANSI escape sequences.
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")

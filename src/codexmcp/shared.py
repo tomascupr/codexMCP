@@ -31,8 +31,8 @@ if not _env_loaded:
     print("Warning: No .env file found in current directory or project root")
 
 from fastmcp import FastMCP
-from logging_cfg import logger
-from pipe import CodexPipe
+from .logging_cfg import logger
+from .pipe import CodexPipe
 
 # ---------------------------------------------------------------------------
 # Shared singletons
@@ -79,4 +79,4 @@ except Exception as e_pipe:
     logger.error("Failed to initialize shared CodexPipe: %s", e_pipe, exc_info=True)
     pipe = None # Ensure pipe is None if initialization fails
 
-__version__ = "0.1.0" 
+__version__ = "0.1.1" 

@@ -16,10 +16,10 @@ import os
 import sys
 
 # Ensure logging is configured early (could also be in shared.py)
-from logging_cfg import logger  # noqa: F401 – ensure logging is configured first.
+from .logging_cfg import logger  # noqa: F401 – ensure logging is configured first.
 
 # Import shared singletons
-from shared import mcp, pipe  # <-- Import from shared.py
+from .shared import mcp, pipe  # <-- Import from shared.py
 
 # Remove direct FastMCP and CodexPipe imports if no longer needed here
 # from fastmcp import FastMCP
@@ -61,7 +61,7 @@ def main() -> None:
     try:
         # Import tools here, which will now import mcp/pipe from shared.py
         logger.info("Importing tools module...")
-        import tools  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
+        from . import tools  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
         logger.info("Tools module imported successfully.")
 
         # Optional: Log registered tools after import

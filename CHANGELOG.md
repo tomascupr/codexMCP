@@ -21,4 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved circular import issue between `server.py` and `tools.py` by introducing `shared.py` for singletons.
 - Corrected issues with tool registration not being recognized by `mcp-cli`.
 - Improved handling of API key propagation to the Codex subprocess.
-- Fixed various bugs related to server startup and `CodexPipe` initialization. 
+- Fixed various bugs related to server startup and `CodexPipe` initialization.
+
+## [0.1.1] - 2025-05-05
+
+### Added
+
+- Restructured project to use the `src/` layout with `pyproject.toml` packaging
+- Added `codexmcp` console script entry point via `[project.scripts]`
+
+### Changed
+
+- Updated imports to use package-relative paths within `codexmcp` namespace
+- Bumped package version to 0.1.1
+
+### Fixed
+
+- Added `main()` function in `server.py` for module entry point
+- Improved `.env` loading to check current directory first and warned if missing
+- Resolved `ImportError` issues for `logging_cfg`, `shared`, and `tools` modules 
