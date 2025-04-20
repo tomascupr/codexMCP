@@ -40,16 +40,16 @@ OPENAI_API_KEY=sk-<your-key>
 
 ### Install CodexMCP
 
-Install directly from GitHub:
-
-```bash
-pip install "git+https://github.com/tomascupr/codexMCP.git#egg=codexmcp"
-```
-
-Or, if published to PyPI (future):
+Install using pip:
 
 ```bash
 pip install codexmcp
+```
+
+Alternatively, install the latest version directly from GitHub:
+
+```bash
+pip install "git+https://github.com/tomascupr/codexMCP.git#egg=codexmcp"
 ```
 
 ---

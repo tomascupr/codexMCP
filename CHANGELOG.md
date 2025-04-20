@@ -39,4 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `main()` function in `server.py` for module entry point
 - Improved `.env` loading to check current directory first and warned if missing
-- Resolved `ImportError` issues for `logging_cfg`, `shared`, and `tools` modules 
+- Resolved `ImportError` issues for `logging_cfg`, `shared`, and `tools` modules
+
+## [0.1.2] - YYYY-MM-DD
+
+### Added
+
+- Setup for PyPI publishing using `build` and `twine`.
+- Configured `.pypirc` for token authentication.
+
+### Changed
+
+- Updated `README.md` with PyPI installation instructions. 
