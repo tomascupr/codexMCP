@@ -70,4 +70,6 @@ except FileNotFoundError:
     pipe = None # Ensure pipe is None if initialization fails
 except Exception as e_pipe:
     logger.error("Failed to initialize shared CodexPipe: %s", e_pipe, exc_info=True)
-    pipe = None # Ensure pipe is None if initialization fails 
+    pipe = None # Ensure pipe is None if initialization fails
+
+__version__ = "0.1.0" 

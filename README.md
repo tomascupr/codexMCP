@@ -17,38 +17,41 @@ to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
 
 ## Installation (Linux/macOS)
 
-The helper script below installs Node 18 LTS, the Codex CLI, creates a Python
+The helper script below installs Node 18 LTS, the Codex CLI, creates a Python
 3.10 `venv` and installs the required PyPI packages.
 
 ```bash
-git clone <repo‑url> codexmcp
+git clone <repo-url> codexmcp
 cd codexmcp
 
-# Needs sudo for the Node 18 APT repo – omit if Node 18 LTS is already present.
+# Needs sudo for the Node 18 APT repo – omit if Node 18 LTS is already present.
 ./setup.sh
 
-# ➊ Create an OpenAI API key and export it so the CLI can authenticate
-export OPENAI_API_KEY="sk‑<your‑key>"
+# ➊ Create an OpenAI API key and place it in a .env file:
+# Create a file named .env in the project root with the following content:
+# OPENAI_API_KEY=sk-<your-key>
+# Note: .env is already in .gitignore
 
-# ➋ Activate the virtual‑env for the current shell (*optional* – convenience)
+# ➋ Activate the virtual-env for the current shell (*optional* - convenience)
 source .venv/bin/activate
 
-# ➌ Run the server (responds on stdin/stdout)
+# ➌ Run the server (responds on stdin/stdout)
 python server.py
 ```
 
+The server now loads the `OPENAI_API_KEY` from the `.env` file automatically.
 The first request may take a couple of seconds while the model warms up; after
-that each call returns in ~0.5‑1.5 s.
+that each call returns in ~0.5‑1.5 s.
 
 ---
 
-## Using `mcp‑cli`
+## Using `mcp-cli`
 
 ```bash
-# List available tools (smoke‑test: should answer <2 s)
+# List available tools (smoke-test: should answer <2 s)
 mcp-cli chat --server CodexMCP -q '["list_tools"]'
 
-# Ask Codex to write a Rust hello‑world program
+# Ask Codex to write a Rust hello-world program
 mcp-cli chat --server CodexMCP -q \
     'mcp__CodexMCP__generate_code("hello world", "Rust")'
 ```
@@ -70,12 +73,12 @@ mcp-cli chat --server CodexMCP -q \
 ## Troubleshooting
 
 • `codex: command not found` → run `npm i -g @openai/codex`, ensure
-  npm’s *global* bin directory is on `$PATH`.
+  npm's *global* bin directory is on `$PATH`.
 • Logs not written → check permissions for `~/.codexmcp`.
-• Long delay before first answer → normal, model container has to warm‑up.
+• Long delay before first answer → normal, model container has to warm-up.
 
 ---
 
 ## License
 
-MIT‑0 – see *LICENSE* if present.
+MIT‑0 – see *LICENSE* if present.
