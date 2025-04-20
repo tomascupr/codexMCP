@@ -16,4 +16,11 @@ dependencies = [
     "python-dotenv",
     "rich",
 ]
-urls = { "Homepage" = "https://github.com/tomascupr/codexmcp" } 
+urls = { "Homepage" = "https://github.com/tomascupr/codexmcp" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["codexmcp*"]
+
+[project.scripts]
+codexmcp = "codexmcp.server:main" 
