@@ -8,10 +8,13 @@ from typing import Any
 from fastmcp import Context, exceptions
 
 from logging_cfg import logger
-from server import mcp, pipe
+from shared import mcp, pipe
 
 
 async def _query_codex(ctx: Context, prompt: str, *, model: str = "o4-mini") -> str:
+    if pipe is None:
+        raise exceptions.ToolError("CodexPipe is not initialized. Cannot query Codex.")
+
     request = {"prompt": prompt, "model": model}
 
     await pipe.send(request)

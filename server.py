@@ -15,39 +15,29 @@ from __future__ import annotations
 import os
 import sys
 
-from fastmcp import FastMCP
-
+# Ensure logging is configured early (could also be in shared.py)
 from logging_cfg import logger  # noqa: F401 – ensure logging is configured first.
-from pipe import CodexPipe
 
+# Import shared singletons
+from shared import mcp, pipe  # <-- Import from shared.py
+
+# Remove direct FastMCP and CodexPipe imports if no longer needed here
+# from fastmcp import FastMCP
+# from pipe import CodexPipe
+
+# Add current directory to path for reliable module discovery
+# _PROJECT_ROOT = os.path.dirname(__file__) or "."
+# sys.path.insert(0, _PROJECT_ROOT) # Moved to shared.py
+
+# Remove the singleton definitions and initialization logic from here
 # ---------------------------------------------------------------------------
-# Shared singletons – created exactly once so that the same instances are used
-# across all imported modules.
+# Shared singletons ...
 # ---------------------------------------------------------------------------
-
-mcp = FastMCP("CodexMCP")
-
-CODEX_CMD = [
-    "codex",
-    "--json",
-    "--pipe",
-    "--approval-mode=full-auto",
-    "--disable-shell",
-]
-
-
-try:
-    pipe = CodexPipe(CODEX_CMD)
-except FileNotFoundError:
-    print(
-        "Error: 'codex' executable not found – install via 'npm i -g @openai/codex' and ensure it is on $PATH.",
-        file=sys.stderr,
-    )
-    raise
-
-# Late import so tools can access the already‑instantiated *mcp* and *pipe*.
-import tools  # noqa: E402  pylint: disable=wrong-import-position,unused-import
-
+# mcp = FastMCP("CodexMCP")
+# pipe: CodexPipe | None = None
+# CODEX_CMD = [...]
+# os.environ[...] = ...
+# try: ... pipe = CodexPipe(...) ... except ... # All moved to shared.py
 
 def _ensure_event_loop_policy() -> None:
     """On Windows the *ProactorEventLoop* is mandatory for subprocess pipes."""
@@ -62,7 +52,37 @@ def _ensure_event_loop_policy() -> None:
 if __name__ == "__main__":
     _ensure_event_loop_policy()
     logger.info("CodexMCP server starting … PID=%s", os.getpid())
+
+    # Check if pipe initialized successfully (imported from shared.py)
+    if pipe is None:
+        logger.error("Shared CodexPipe failed to initialize. Server cannot start.")
+        sys.exit(1)
+
     try:
-        mcp.run()
+        # Import tools here, which will now import mcp/pipe from shared.py
+        logger.info("Importing tools module...")
+        import tools  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
+        logger.info("Tools module imported successfully.")
+
+        # Optional: Log registered tools after import
+        try:
+            # Need asyncio loop to run get_tools, log confirms import success for now
+            # tools_dict = asyncio.run(mcp.get_tools()) # Avoid asyncio.run here
+            # logger.info("Registered tools check (requires running loop): %s", list(tools_dict.keys()))
+            pass
+        except Exception as e_get_tools:
+             logger.error("Failed during tool check phase: %s", str(e_get_tools), exc_info=True)
+
+        logger.info("Starting FastMCP server run loop...")
+        mcp.run() # This starts the server and event loop
+        logger.info("FastMCP server run loop finished.")
+
+    except ImportError as e_import:
+        logger.error("Failed to import tools module: %s", e_import, exc_info=True)
+        # Decide if server should run without tools
+    except Exception as e_main:
+        logger.error("Error in server main execution: %s", str(e_main), exc_info=True)
+        # Consider exiting if error is critical
+        # sys.exit(1)
     finally:
         logger.info("CodexMCP server shutting down.")

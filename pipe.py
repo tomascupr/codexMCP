@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import threading
 from subprocess import PIPE, Popen
@@ -28,6 +29,18 @@ class CodexPipe:
     def __init__(self, cmd: list[str]):
         logger.info("Starting Codex CLI: %s", " ".join(cmd))
 
+        # Set CI=true environment variable to potentially avoid UI crashes
+        popen_env = os.environ.copy()
+        popen_env['CI'] = 'true'
+        
+        # Remove explicit OPENAI_API_KEY handling - should be inherited via os.environ now
+        # if 'OPENAI_API_KEY' in os.environ:
+        #     logger.info("Passing OPENAI_API_KEY to Codex subprocess environment.")
+        #     popen_env['OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
+        # else:
+        #     logger.warning("OPENAI_API_KEY not found in environment for Codex subprocess.")
+
+        logger.info("Starting Popen, inheriting environment.")
         self.process: Popen[str] = Popen(
             cmd,
             stdin=PIPE,
@@ -35,7 +48,9 @@ class CodexPipe:
             stderr=PIPE,
             text=True,
             bufsize=1,
+            env=popen_env,
         )
+        logger.info("Popen process started for Codex CLI.")
 
         if not self.process.stdin or not self.process.stdout or not self.process.stderr:
             raise RuntimeError("Failed to open Codex subprocess pipes.")
