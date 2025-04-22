@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/codexmcp.svg)](https://badge.fury.io/py/codexmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Minimal **FastMCP** server that wraps the OpenAI **Codex CLI** and makes the
+Minimal **FastMCP** server that wraps the OpenAI **Codex CLI** and makes the
 model available over standard‑I/O so it can be consumed with `mcp‑cli` (or any
 other MCP‑compatible client).
 
@@ -18,7 +18,7 @@ Tools exposed by this server (all asynchronous):
 5. `generate_docs(code, doc_format="docstring", model="o4-mini")` - Generates documentation for the `code`. `doc_format` specifies the format (e.g., "docstring", "markdown"). `model` selects the OpenAI model.
 
 Everything that the Codex subprocess prints (stdout **and** stderr) is recorded
-to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
+to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
 
 ---
 
@@ -75,8 +75,8 @@ that each call returns in ~0.5‑1.5 s.
 Run the test suite with pytest:
 
 ```bash
-# Install test dependencies
-pip install -r requirements.txt
+# Install the package in editable mode with test dependencies
+pip install -e .[test]
 
 # Run all tests
 pytest

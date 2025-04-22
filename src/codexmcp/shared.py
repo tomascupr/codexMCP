@@ -39,6 +39,10 @@ from .pipe import CodexPipe
 console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in ("1", "true", "yes", "on")
 logger = configure_logging(console=console_logging)
 
+# Default model configuration
+DEFAULT_MODEL = os.environ.get("CODEXMCP_DEFAULT_MODEL", "o4-mini")
+logger.info("Default model set to: %s (override with CODEXMCP_DEFAULT_MODEL env var)", DEFAULT_MODEL)
+
 # ---------------------------------------------------------------------------
 # Shared singletons
 # ---------------------------------------------------------------------------
@@ -94,4 +98,4 @@ else:
     # Logged the error earlier when codex_executable_path was None
     pipe = None
 
-__version__ = "0.1.3" 
+__version__ = "0.1.4" 

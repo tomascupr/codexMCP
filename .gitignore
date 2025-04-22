@@ -181,3 +181,6 @@ codex/
 
 # MCP CLI configuration
 server_config.json
+
+# General log files
+*.log
