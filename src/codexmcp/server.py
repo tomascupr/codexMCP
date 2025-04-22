@@ -6,8 +6,10 @@ Run via
 
 or as a module once the project root is on *PYTHONPATH*.
 
-The server exposes three tools – *generate_code*, *refactor_code* and
-*write_tests* – over *stdio* for use with *mcp‑cli* and compatible clients.
+The server exposes tools like *generate_code*, *refactor_code*, *write_tests*,
+*explain_code*, and *generate_docs* over *stdio* for use with *mcp‑cli* and compatible clients.
+
+You can enable console logging by setting the CODEXMCP_CONSOLE_LOG environment variable to "1".
 """
 
 from __future__ import annotations
@@ -15,8 +17,12 @@ from __future__ import annotations
 import os
 import sys
 
-# Ensure logging is configured early (could also be in shared.py)
-from .logging_cfg import logger  # noqa: F401 – ensure logging is configured first.
+# Configure logging based on environment variable
+console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in ("1", "true", "yes", "on")
+
+# Ensure logging is configured early with console output if enabled
+from .logging_cfg import configure_logging
+logger = configure_logging(console=console_logging)
 
 # Import shared singletons
 from .shared import mcp, pipe  # <-- Import from shared.py
@@ -51,7 +57,8 @@ def _ensure_event_loop_policy() -> None:
 def main() -> None:
     """Main entry point for the CodexMCP server."""
     _ensure_event_loop_policy()
-    logger.info("CodexMCP server starting … PID=%s", os.getpid())
+    logger.info("=== CodexMCP Server Starting === PID=%s ===", os.getpid())
+    logger.info("Console logging is %s", "ENABLED" if console_logging else "DISABLED")
 
     # Check if pipe initialized successfully (imported from shared.py)
     if pipe is None:
@@ -64,18 +71,20 @@ def main() -> None:
         from . import tools  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
         logger.info("Tools module imported successfully.")
 
-        # Optional: Log registered tools after import
-        try:
-            # Need asyncio loop to run get_tools, log confirms import success for now
-            # tools_dict = asyncio.run(mcp.get_tools()) # Avoid asyncio.run here
-            # logger.info("Registered tools check (requires running loop): %s", list(tools_dict.keys()))
-            pass
-        except Exception as e_get_tools:
-             logger.error("Failed during tool check phase: %s", str(e_get_tools), exc_info=True)
-
-        logger.info("Starting FastMCP server run loop...")
-        mcp.run() # This starts the server and event loop
-        logger.info("FastMCP server run loop finished.")
+        # Log available tools
+        tool_names = [
+            "generate_code", "refactor_code", "write_tests", 
+            "explain_code", "generate_docs"
+        ]
+        logger.info("Available tools: %s", ", ".join(tool_names))
+        
+        logger.info("Server is ready to process requests.")
+        logger.info("=== Starting FastMCP Server Loop ===")
+        
+        # This starts the server and event loop
+        mcp.run()
+        
+        logger.info("=== FastMCP Server Loop Finished ===")
 
     except ImportError as e_import:
         logger.error("Failed to import tools module: %s", e_import, exc_info=True)

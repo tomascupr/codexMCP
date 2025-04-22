@@ -178,3 +178,6 @@ CLAUDE.md
 
 # External codex repository
 codex/
+
+# MCP CLI configuration
+server_config.json

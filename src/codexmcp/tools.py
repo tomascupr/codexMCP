@@ -37,6 +37,7 @@ async def _query_codex(ctx: Context, prompt: str, *, model: str = "o4-mini") -> 
 @mcp.tool()
 async def generate_code(ctx: Context, description: str, language: str = "Python", model: str = "o4-mini") -> str:
     """Generate *language* source code that fulfils *description*."""
+    logger.info("TOOL REQUEST: generate_code - language=%s, model=%s", language, model)
 
     prompt = (
         f"# Task: Code Generation\n"
@@ -58,6 +59,7 @@ async def generate_code(ctx: Context, description: str, language: str = "Python"
 @mcp.tool()
 async def refactor_code(ctx: Context, code: str, instruction: str, model: str = "o4-mini") -> str:
     """Refactor *code* as per *instruction*."""
+    logger.info("TOOL REQUEST: refactor_code - model=%s", model)
 
     prompt = (
         "# Task: Code Refactoring\n"
@@ -80,6 +82,7 @@ async def refactor_code(ctx: Context, code: str, instruction: str, model: str = 
 @mcp.tool()
 async def write_tests(ctx: Context, code: str, description: str = "", model: str = "o4-mini") -> str:
     """Generate unit tests for *code*."""
+    logger.info("TOOL REQUEST: write_tests - model=%s", model)
 
     prompt = (
         "# Task: Test Development\n"
@@ -105,6 +108,7 @@ async def explain_code(ctx: Context, code: str, detail_level: str = "medium", mo
     
     The *detail_level* can be 'brief', 'medium', or 'detailed'.
     """
+    logger.info("TOOL REQUEST: explain_code - detail_level=%s, model=%s", detail_level, model)
     
     prompt = (
         "# Task: Code Explanation\n"
@@ -131,6 +135,7 @@ async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", 
     
     The *doc_format* can be 'docstring', 'markdown', or 'html'.
     """
+    logger.info("TOOL REQUEST: generate_docs - doc_format=%s, model=%s", doc_format, model)
     
     prompt = (
         "# Task: Documentation Generation\n"

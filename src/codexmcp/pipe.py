@@ -66,7 +66,7 @@ class CodexPipe:
 
     async def send(self, message: dict[str, Any]) -> None:
         data = json.dumps(message, ensure_ascii=False)
-        logger.info("→ prompt: %s", data)
+        logger.info("→ SENDING REQUEST: %s", data)
 
         async with self._write_lock:
             await asyncio.to_thread(self._write, data)
@@ -98,7 +98,7 @@ class CodexPipe:
             if not line.strip():
                 continue
 
-            logger.info("← response: %s", line)
+            logger.info("← RECEIVED RESPONSE: %s", line)
             return line
 
     # ------------------------------------------------------------------

@@ -6,14 +6,14 @@ other MCP‑compatible client).
 
 Tools exposed by this server (all asynchronous):
 
-1. `generate_code(description, language="Python", model="o4-mini")`
-2. `refactor_code(code, instruction, model="o4-mini")`
-3. `write_tests(code, description="", model="o4-mini")`
-4. `explain_code(code, detail_level="medium", model="o4-mini")`
-5. `generate_docs(code, doc_format="docstring", model="o4-mini")`
+1. `generate_code(description, language="Python", model="o4-mini")` - Specify any model supported by the Codex CLI (e.g., "gpt-4", "gpt-4o-mini").
+2. `refactor_code(code, instruction, model="o4-mini")` - Specify any model supported by the Codex CLI.
+3. `write_tests(code, description="", model="o4-mini")` - Specify any model supported by the Codex CLI.
+4. `explain_code(code, detail_level="medium", model="o4-mini")` - Specify any model supported by the Codex CLI.
+5. `generate_docs(code, doc_format="docstring", model="o4-mini")` - Specify any model supported by the Codex CLI.
 
-Everything that the Codex subprocess prints (stdout **and** stderr) is recorded
-to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
+Everything that the Codex subprocess prints (stdout **and** stderr) is recorded
+to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
 
 ---
 
@@ -66,7 +66,7 @@ Once installed, you can start the server in one of two ways:
   ```
 
 The first request may take a couple of seconds while the model warms up; after
-that each call returns in ~0.5‑1.5 s.
+that each call returns in ~0.5‑1.5 s.
 
 ---
 

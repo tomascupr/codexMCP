@@ -32,7 +32,7 @@ def _ensure_log_dir() -> Path:
     return _LOG_DIR
 
 
-def configure_logging(name: str = "codexmcp") -> logging.Logger:
+def configure_logging(name: str = "codexmcp", console: bool = True) -> logging.Logger:
     log_dir = _ensure_log_dir()
     log_file = log_dir / "codexmcp.log"
 
@@ -41,9 +41,18 @@ def configure_logging(name: str = "codexmcp") -> logging.Logger:
         return logger
 
     logger.setLevel(logging.INFO)
-    handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-    logger.addHandler(handler)
+    
+    # File handler for persistent logs
+    file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logger.addHandler(file_handler)
+    
+    # Console handler for real-time monitoring
+    if console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logger.addHandler(console_handler)
+    
     logger.propagate = False
 
     return logger

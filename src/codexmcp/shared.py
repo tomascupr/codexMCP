@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import shutil  # Import shutil
 
 # Add project root to path early for imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) or "."
@@ -31,8 +32,12 @@ if not _env_loaded:
     print("Warning: No .env file found in current directory or project root")
 
 from fastmcp import FastMCP
-from .logging_cfg import logger
+from .logging_cfg import configure_logging
 from .pipe import CodexPipe
+
+# Configure logging with console output based on environment variable
+console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in ("1", "true", "yes", "on")
+logger = configure_logging(console=console_logging)
 
 # ---------------------------------------------------------------------------
 # Shared singletons
@@ -44,39 +49,49 @@ logger.info("Shared MCP instance initialized.")
 
 pipe: CodexPipe | None = None
 
-CODEX_CMD = [
-    "/Users/tomascupr/Library/pnpm/codex",
-    "--json",
-    "--pipe",
-    "-q", "Hello",  # initial dummy prompt to satisfy quiet mode
-    "--approval-mode=full-auto",
-    "--disable-shell",
-]
+# Find codex executable on PATH
+codex_executable_path = shutil.which("codex")
+
+if not codex_executable_path:
+    logger.error(
+        "Error: 'codex' executable not found on system PATH. "
+        "Install via 'npm i -g @openai/codex' and ensure its directory is in your $PATH."
+    )
+    CODEX_CMD = None # Set to None if not found
+else:
+    logger.info(f"Found 'codex' executable at: {codex_executable_path}")
+    CODEX_CMD = [
+        codex_executable_path, # Use the found path
+        "--json",
+        "--pipe",
+        "-q", "Hello",  # initial dummy prompt to satisfy quiet mode
+        "--approval-mode=full-auto",
+        "--disable-shell",
+    ]
 
 # Set environment variable before creating the pipe
 os.environ["CODEX_ALLOW_DIRTY"] = "1"
 # OPENAI_API_KEY is handled within CodexPipe initialization in pipe.py
 
-try:
-    logger.info("Initializing shared CodexPipe instance...")
-    pipe = CodexPipe(CODEX_CMD)
-    logger.info("Shared CodexPipe instance initialized.")
-    # Discard the first response
-    logger.info("Attempting to discard dummy prompt response in shared...")
+# Initialize CodexPipe only if the command was found
+if CODEX_CMD:
     try:
-        # Consider making this non-blocking if it causes startup delays
-        _ = pipe.process.stdout.readline()
-        logger.info("Dummy prompt response discarded in shared.")
-    except Exception as e_read:
-        logger.warning("Could not read/discard dummy prompt response in shared: %s", e_read)
-except FileNotFoundError:
-    logger.error(
-        "Error: 'codex' executable not found in shared.py. Install via 'npm i -g @openai/codex' and ensure it is on $PATH.",
-        exc_info=True
-    )
-    pipe = None # Ensure pipe is None if initialization fails
-except Exception as e_pipe:
-    logger.error("Failed to initialize shared CodexPipe: %s", e_pipe, exc_info=True)
-    pipe = None # Ensure pipe is None if initialization fails
+        logger.info("Initializing shared CodexPipe instance...")
+        pipe = CodexPipe(CODEX_CMD)
+        logger.info("Shared CodexPipe instance initialized.")
+        # Discard the first response
+        logger.info("Attempting to discard dummy prompt response in shared...")
+        try:
+            # Consider making this non-blocking if it causes startup delays
+            _ = pipe.process.stdout.readline()
+            logger.info("Dummy prompt response discarded in shared.")
+        except Exception as e_read:
+            logger.warning("Could not read/discard dummy prompt response in shared: %s", e_read)
+    except Exception as e_pipe: # Catch generic exceptions during pipe init
+        logger.error("Failed to initialize shared CodexPipe with command '%s': %s", " ".join(CODEX_CMD), e_pipe, exc_info=True)
+        pipe = None # Ensure pipe is None if initialization fails
+else:
+    # Logged the error earlier when codex_executable_path was None
+    pipe = None
 
 __version__ = "0.1.3" 

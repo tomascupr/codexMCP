@@ -1,12 +1,11 @@
 {
   "mcpServers": {
     "CodexMCP": {
-      "command": "/Users/tomascupr/codexmcp/.venv/bin/python",
-      "args": ["server.py"],
-      "env": {
-        "PYTHONPATH": ".",
-        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-      }
+      "command": "python",
+      "args": [
+        "-m",
+        "codexmcp.server"
+      ]
     }
   }
 } 
