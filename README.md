@@ -16,6 +16,7 @@ Tools exposed by this server (all asynchronous):
 3. `write_tests(code, description="", model="o4-mini")` - Writes tests for the given `code`, optionally guided by a `description`. `model` selects the OpenAI model.
 4. `explain_code(code, detail_level="medium", model="o4-mini")` - Explains the given `code`. `detail_level` controls verbosity ("brief", "medium", "detailed"). `model` selects the OpenAI model.
 5. `generate_docs(code, doc_format="docstring", model="o4-mini")` - Generates documentation for the `code`. `doc_format` specifies the format (e.g., "docstring", "markdown"). `model` selects the OpenAI model.
+6. `write_openai_agent(name, instructions, tool_functions=[], description="", model="o4-mini")` - Generates Python code for an agent using the `openai-agents` SDK. Takes agent `name`, `instructions`, a list of natural language `tool_functions` descriptions, and optional `description`. `model` selects the OpenAI model.
 
 Everything that the Codex subprocess prints (stdout **and** stderr) is recorded
 to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
@@ -86,6 +87,9 @@ pytest --cov=codexmcp
 
 # Run specific test file
 pytest tests/test_tools.py
+
+# Run manual client test script to verify stdio connectivity
+python tests/manual_client_test.py
 ```
 
 ---

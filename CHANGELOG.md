@@ -9,20 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## [0.1.3] - 2025-04-21
-
-### Added
-
 - Two new tools:
   - `explain_code`: Explains code at various detail levels ("brief", "medium", "detailed")
   - `generate_docs`: Generates documentation in different formats ("docstring", "markdown", "html")
@@ -31,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Test fixtures and configurations
   - Coverage reporting setup
   - Testing documentation in README
+- New tool: `write_openai_agent` for generating OpenAI Agents SDK code.
+- Manual client test script (`tests/manual_client_test.py`) to verify server connectivity and tool listing over stdio.
 
 ### Changed
 
