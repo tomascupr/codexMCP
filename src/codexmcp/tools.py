@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import importlib.resources  # Use importlib.resources
-from typing import Any
+from typing import Any, List
 
 from fastmcp import Context, exceptions
 
@@ -100,4 +100,33 @@ async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", 
     logger.info("TOOL REQUEST: generate_docs - doc_format=%s, model=%s", doc_format, model)
     template = _load_prompt("generate_docs")
     prompt = template.format(code=code.strip(), doc_format=doc_format)
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def write_openai_agent(ctx: Context, name: str, instructions: str, tool_functions: List[str] = [], description: str = "", model: str = DEFAULT_MODEL) -> str:
+    """Generate Python code for an OpenAI Agent using the `openai-agents` SDK.
+
+    Args:
+        ctx: The FastMCP context.
+        name: The desired name for the agent.
+        instructions: The system prompt/instructions for the agent.
+        tool_functions: A list of natural language descriptions for tools the agent should have.
+        description: Optional additional details about the agent's behavior or tool implementation.
+        model: The OpenAI model to use (e.g., 'o4-mini', 'gpt-4').
+    """
+    logger.info("TOOL REQUEST: write_openai_agent - name=%s, model=%s", name, model)
+    template = _load_prompt("write_openai_agent")
+
+    # Format the tool functions list for the prompt
+    formatted_tool_funcs = "\n".join([f"- {func_desc}" for func_desc in tool_functions])
+    if not formatted_tool_funcs:
+        formatted_tool_funcs = "# No tools specified."
+
+    prompt = template.format(
+        name=name,
+        instructions=instructions.strip(),
+        tool_functions=formatted_tool_funcs,
+        description=description.strip()
+    )
     return await _query_codex(ctx, prompt, model=model)
