@@ -8,7 +8,7 @@ CodexMCP is a service that gives your applications access to AI coding capabilit
 
 Think of CodexMCP as a bridge between your application and OpenAI's powerful AI coding capabilities. You send structured requests to the server (like "generate Python code that sorts a list"), and it returns the requested code or documentation.
 
-A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/openai/code-interpreter) to provide AI code generation, refactoring, and documentation capabilities through a standardized API.
+A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/openai/codex) to provide AI code generation, refactoring, and documentation capabilities through a standardized API.
 
 ## Installation
 
@@ -22,18 +22,17 @@ A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/open
 
 2. **Install CodexMCP**:
    ```bash
-   pip install -e .
+   pip install codexmcp
    ```
-   
-   For development, install with test dependencies:
+   (Optional) Install test dependencies:
    ```bash
-   pip install -e .[test]
+   pip install codexmcp[test]
    ```
 
 3. **Environment Setup**:
    - Create a `.env` file in your project root
    - Add your OpenAI API key:
-     ```
+     ```ini
      OPENAI_API_KEY=sk-your-key-here
      ```
    - Optional environment variables:
