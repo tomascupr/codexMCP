@@ -15,7 +15,7 @@ A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/open
 1. **Prerequisites**:
    - Node.js 18 LTS or later
    - Python 3.10 or later
-   - [Codex CLI](https://github.com/openai/code-interpreter) installed globally:
+   - [Codex CLI](https://github.com/openai/codex) installed globally:
      ```bash
      npm install -g @openai/codex
      ```
