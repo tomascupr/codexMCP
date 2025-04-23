@@ -11,7 +11,7 @@ other MCP‑compatible client).
 
 Tools exposed by this server (all asynchronous):
 
-1. `generate_code(description, language="Python", model="o4-mini")` - Generates code based on a `description`. `language` specifies the target language. `model` selects the OpenAI model (e.g., "gpt-4", "gpt-4o-mini").
+1. `generate_code(description, language="Python", model="o4-mini")` - Generates code based on a `description`. `language` specifies the target language. `model` selects the OpenAI model (e.g., "gpt-4", "o4-mini", "o3").
 2. `refactor_code(code, instruction, model="o4-mini")` - Refactors the given `code` based on an `instruction`. `model` selects the OpenAI model.
 3. `write_tests(code, description="", model="o4-mini")` - Writes tests for the given `code`, optionally guided by a `description`. `model` selects the OpenAI model.
 4. `explain_code(code, detail_level="medium", model="o4-mini")` - Explains the given `code`. `detail_level` controls verbosity ("brief", "medium", "detailed"). `model` selects the OpenAI model.
