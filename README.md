@@ -27,7 +27,7 @@ to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
 
 ### Prerequisites
 
-1. Install Node 18 LTS and the Codex CLI globally (see [OpenAI Codex CLI setup](https://github.com/openai/codex-cli#setup) for details):
+1. Install Node 18 LTS and the Codex CLI globally (see [OpenAI Codex CLI setup](https://github.com/openai/codex) for details):
 
 ```bash
 npm install -g @openai/codex
