@@ -16,29 +16,34 @@ A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/open
    - Node.js 18 LTS or later
    - Python 3.10 or later
    - [Codex CLI](https://github.com/openai/codex) installed globally:
+
      ```bash
      npm install -g @openai/codex
      ```
 
 2. **Install CodexMCP**:
+
    ```bash
    pip install codexmcp
    ```
-   (Optional) Install test dependencies:
+
+   **Optional (test dependencies)**:
+
    ```bash
    pip install codexmcp[test]
    ```
 
 3. **Environment Setup**:
-   - Create a `.env` file in your project root
+   - Create a `.env` file in your project root.
    - Add your OpenAI API key:
+
      ```ini
      OPENAI_API_KEY=sk-your-key-here
      ```
    - Optional environment variables:
-     - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "o4-mini")
-     - `CODEXMCP_LOG_LEVEL`: Logging level (default: INFO)
-     - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: true)
+     - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "o4-mini").
+     - `CODEXMCP_LOG_LEVEL`: Logging level (default: INFO).
+     - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: true).
 
 ## Usage
 
