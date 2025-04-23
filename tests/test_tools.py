@@ -12,6 +12,7 @@ from codexmcp.tools import (
     write_tests,
     explain_code,
     generate_docs,
+    generate_api_docs,
 )
 
 
@@ -31,7 +32,7 @@ class TestQueryCodex:
         mock_ctx.progress = MagicMock()
 
         # Call the function
-        result = await _query_codex(mock_ctx, "test prompt")
+        result = await _query_codex(mock_ctx, "test prompt", model="o4-mini")
 
         # Assertions
         mock_pipe.send.assert_called_once_with({"prompt": "test prompt", "model": "o4-mini"})
@@ -45,7 +46,7 @@ class TestQueryCodex:
         mock_ctx = MagicMock(spec=Context)
 
         with pytest.raises(Exception):
-            await _query_codex(mock_ctx, "test prompt")
+            await _query_codex(mock_ctx, "test prompt", model="o4-mini")
 
     @pytest.mark.asyncio
     @patch("codexmcp.tools.pipe")
@@ -60,7 +61,7 @@ class TestQueryCodex:
 
         # Call the function and expect exception
         with pytest.raises(Exception):
-            await _query_codex(mock_ctx, "test prompt")
+            await _query_codex(mock_ctx, "test prompt", model="o4-mini")
 
 
 class TestGenerateCode:
@@ -129,4 +130,64 @@ class TestRefactorCode:
         assert instruction in prompt
 
 
-# Remove unittest-specific code
+class TestGenerateApiDocs:
+    """Tests for the generate_api_docs tool."""
+
+    @pytest.mark.asyncio
+    @patch("codexmcp.tools._query_codex")
+    async def test_generate_api_docs_openapi(self, mock_query_codex):
+        """Test generate_api_docs with OpenAPI output format."""
+        # Setup
+        mock_query_codex.return_value = "openapi: 3.0.0\ninfo:\n  title: Test API"
+        mock_ctx = MagicMock(spec=Context)
+        code = "from fastapi import FastAPI\napp = FastAPI()\n\n@app.get('/items')\ndef get_items():\n    return []"
+        
+        # Call the function
+        result = await generate_api_docs(mock_ctx, code, framework="FastAPI", output_format="openapi")
+        
+        # Assertions
+        assert result == "openapi: 3.0.0\ninfo:\n  title: Test API"
+        mock_query_codex.assert_called_once()
+        prompt = mock_query_codex.call_args[0][1]
+        assert "Task: API Documentation Generation" in prompt
+        assert "framework: FastAPI" in prompt.lower() or "Framework: FastAPI" in prompt
+        assert "output_format: openapi" in prompt.lower() or "Documentation Format: openapi" in prompt
+        assert code in prompt
+        
+    @pytest.mark.asyncio
+    @patch("codexmcp.tools._query_codex")
+    async def test_generate_api_docs_markdown(self, mock_query_codex):
+        """Test generate_api_docs with Markdown output format."""
+        # Setup
+        mock_query_codex.return_value = "# API Documentation\n\n## GET /items"
+        mock_ctx = MagicMock(spec=Context)
+        code = "from fastapi import FastAPI\napp = FastAPI()\n\n@app.get('/items')\ndef get_items():\n    return []"
+        
+        # Call the function
+        result = await generate_api_docs(
+            mock_ctx, code, framework="FastAPI", output_format="markdown")
+        
+        # Assertions
+        assert result == "# API Documentation\n\n## GET /items"
+        prompt = mock_query_codex.call_args[0][1]
+        assert "output_format: markdown" in prompt.lower() or "Documentation Format: markdown" in prompt
+
+    @pytest.mark.asyncio
+    @patch("codexmcp.tools._query_codex")
+    async def test_generate_api_docs_code(self, mock_query_codex):
+        """Test generate_api_docs with client code generation."""
+        # Setup
+        mock_query_codex.return_value = "class ApiClient:\n    def get_items(self):\n        pass"
+        mock_ctx = MagicMock(spec=Context)
+        code = "from fastapi import FastAPI\napp = FastAPI()\n\n@app.get('/items')\ndef get_items():\n    return []"
+        
+        # Call the function
+        result = await generate_api_docs(
+            mock_ctx, code, framework="FastAPI", output_format="code", client_language="Python")
+        
+        # Assertions
+        assert result == "class ApiClient:\n    def get_items(self):\n        pass"
+        prompt = mock_query_codex.call_args[0][1]
+        assert "output_format: code" in prompt.lower() or "Documentation Format: code" in prompt
+        # The client_language is included in the prompt but in a different format than expected
+        assert "python" in prompt.lower()

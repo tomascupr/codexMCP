@@ -1,99 +1,165 @@
 # CodexMCP
 
-[![PyPI version](https://badge.fury.io/py/codexmcp.svg)](https://badge.fury.io/py/codexmcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## What is CodexMCP?
 
-Minimal **FastMCP** server that wraps the OpenAI **Codex CLI** and makes the
-model available over standard‑I/O so it can be consumed with `mcp‑cli` (or any
-other MCP‑compatible client).
+CodexMCP is a service that gives your applications access to AI coding capabilities without needing to build complex integrations. It's a server that exposes powerful code-related AI tools through a simple, standardized API.
 
-**This project is open-sourced under the MIT License. See the LICENSE file for details.**
+**Important:** CodexMCP is **not** an autonomous agent - it's a tool provider that responds to specific requests. Your application remains in control, making specific requests for code generation, refactoring, or documentation as needed.
 
-Tools exposed by this server (all asynchronous):
+Think of CodexMCP as a bridge between your application and OpenAI's powerful AI coding capabilities. You send structured requests to the server (like "generate Python code that sorts a list"), and it returns the requested code or documentation.
 
-1. `generate_code(description, language="Python", model="o4-mini")` - Generates code based on a `description`. `language` specifies the target language. `model` selects the OpenAI model (e.g., "gpt-4", "o4-mini", "o3").
-2. `refactor_code(code, instruction, model="o4-mini")` - Refactors the given `code` based on an `instruction`. `model` selects the OpenAI model.
-3. `write_tests(code, description="", model="o4-mini")` - Writes tests for the given `code`, optionally guided by a `description`. `model` selects the OpenAI model.
-4. `explain_code(code, detail_level="medium", model="o4-mini")` - Explains the given `code`. `detail_level` controls verbosity ("brief", "medium", "detailed"). `model` selects the OpenAI model.
-5. `generate_docs(code, doc_format="docstring", model="o4-mini")` - Generates documentation for the `code`. `doc_format` specifies the format (e.g., "docstring", "markdown"). `model` selects the OpenAI model.
-6. `write_openai_agent(name, instructions, tool_functions=[], description="", model="o4-mini")` - Generates Python code for an agent using the `openai-agents` SDK. Takes agent `name`, `instructions`, a list of natural language `tool_functions` descriptions, and optional `description`. `model` selects the OpenAI model.
+A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/openai/code-interpreter) to provide AI code generation, refactoring, and documentation capabilities through a standardized API.
 
-Everything that the Codex subprocess prints (stdout **and** stderr) is recorded
-to `~/.codexmcp/logs/` with rotation (5 files × 5 MiB).
+## Installation
 
----
+1. **Prerequisites**:
+   - Node.js 18 LTS or later
+   - Python 3.10 or later
+   - [Codex CLI](https://github.com/openai/code-interpreter) installed globally:
+     ```bash
+     npm install -g @openai/codex
+     ```
 
-## Installation (Linux/macOS)
+2. **Install CodexMCP**:
+   ```bash
+   pip install -e .
+   ```
+   
+   For development, install with test dependencies:
+   ```bash
+   pip install -e .[test]
+   ```
 
-### Prerequisites
+3. **Environment Setup**:
+   - Create a `.env` file in your project root
+   - Add your OpenAI API key:
+     ```
+     OPENAI_API_KEY=sk-your-key-here
+     ```
+   - Optional environment variables:
+     - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "o4-mini")
+     - `CODEXMCP_LOG_LEVEL`: Logging level (default: INFO)
+     - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: true)
 
-1. Install Node 18 LTS and the Codex CLI globally (see [OpenAI Codex CLI setup](https://github.com/openai/codex) for details):
+## Usage
+
+### Running the Server
+
+Start the CodexMCP server with one simple command:
 
 ```bash
-npm install -g @openai/codex
+python -m codexmcp.server
 ```
 
-2. Create a `.env` file in your working directory:
-
-```ini
-OPENAI_API_KEY=sk-<your-key>
-```
-
-### Install CodexMCP
-
-Install using pip:
+or use the convenient entry point:
 
 ```bash
-pip install codexmcp
+codexmcp
 ```
 
----
+The server will start listening on port 8080 (by default). Your applications can now make requests to the server's API endpoints.
 
-## Running the server
+### How It Works
 
-Once installed, you can start the server in one of two ways:
+1. **Your Application** makes a request to a specific CodexMCP endpoint (like `/tools/generate_code`)
+2. **CodexMCP Server** processes the request and sends it to the OpenAI model
+3. **OpenAI Model** generates the requested code or documentation
+4. **CodexMCP Server** returns the result to your application
 
-- Using the console script:
+This approach gives you the power of AI coding assistance while keeping your application in control of when and how to use it.
 
-  ```bash
-  codexmcp
-  ```
+### Available Tools
 
-The first request may take a couple of seconds while the model warms up; after
-that each call returns in ~0.5‑1.5 s.
+CodexMCP provides the following AI-powered tools:
 
----
+1. **generate_code**: Generate code in any programming language
+   - `description`: Task description
+   - `language`: Programming language (default: "Python")
 
-## Troubleshooting
+2. **refactor_code**: Improve existing code
+   - `code`: Source code to refactor
+   - `instruction`: How to refactor the code
 
-• `codex: command not found` → ensure npm's global bin directory is on `$PATH`.
-• `.env` warnings → make sure your `.env` file is in your working directory.
-• Logs not written → check permissions for `~/.codexmcp`.
-• Long delay before first answer → normal, model container has to warm up.
+3. **write_tests**: Generate unit tests for code
+   - `code`: Source code to test
+   - `description`: Additional testing requirements
+
+4. **explain_code**: Explain code functionality and structure
+   - `code`: Source code to explain
+   - `detail_level`: Level of detail ("brief", "medium", "detailed")
+
+5. **generate_docs**: Create documentation for code
+   - `code`: Source code to document
+   - `doc_format`: Output format ("docstring", "markdown", "html")
+
+6. **write_openai_agent**: Generate an OpenAI Agent implementation
+   - `name`: Agent name
+   - `instructions`: Agent system prompt
+   - `tool_functions`: List of tool descriptions
+   - `description`: Additional agent details
+
+7. **generate_api_docs**: Generate API documentation or client code
+   - `code`: API implementation code
+   - `framework`: Web framework used (default: "FastAPI")
+   - `output_format`: Output format ("openapi", "swagger", "markdown", "code")
+   - `client_language`: Language for client code (when output_format is "code")
+
+### Example Client
+
+```python
+import asyncio
+from fastmcp import MCPClient
+
+async def main():
+    client = MCPClient("http://localhost:8080")
+    
+    # Generate some Python code
+    code = await client.generate_code(
+        description="Create a function to calculate Fibonacci numbers",
+        language="Python"
+    )
+    print(code)
+    
+    # Generate API documentation
+    api_code = """
+    from fastapi import FastAPI, Query
+    
+    app = FastAPI()
+    
+    @app.get("/items/")
+    async def read_items(q: str = Query(None, min_length=3, max_length=50)):
+        results = {"items": [{"item_id": "Foo"}, {"item_id": "Bar"}]}
+        if q:
+            results["items"] = [item for item in results["items"] if q in item["item_id"]]
+        return results
+    """
+    
+    docs = await client.generate_api_docs(
+        code=api_code,
+        framework="FastAPI",
+        output_format="openapi"
+    )
+    print(docs)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
 ## Testing
 
-Run the test suite with pytest:
+Run tests with pytest:
 
 ```bash
-# Install the package in editable mode with test dependencies
-pip install -e .[test]
-
 # Run all tests
 pytest
 
-# Run with coverage report
+# Run a specific test
+pytest tests/test_tools.py::TestGenerateCode
+
+# Test with coverage
 pytest --cov=codexmcp
-
-# Run specific test file
-pytest tests/test_tools.py
-
-# Run manual client test script to verify stdio connectivity
-python tests/manual_client_test.py
 ```
-
----
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT

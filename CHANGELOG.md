@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New tool: `generate_api_docs` for creating API documentation:
+  - Generate OpenAPI 3.0 specifications in YAML format
+  - Generate Swagger 2.0 specifications in JSON format
+  - Create detailed markdown API documentation
+  - Generate client code based on API definitions
 - Two new tools:
   - `explain_code`: Explains code at various detail levels ("brief", "medium", "detailed")
   - `generate_docs`: Generates documentation in different formats ("docstring", "markdown", "html")

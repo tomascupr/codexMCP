@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import importlib.resources  # Use importlib.resources
-from typing import Any, List
+from typing import Any, List, Literal
 
 from fastmcp import Context, exceptions
 
@@ -129,4 +129,41 @@ async def write_openai_agent(ctx: Context, name: str, instructions: str, tool_fu
         tool_functions=formatted_tool_funcs,
         description=description.strip()
     )
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def generate_api_docs(
+    ctx: Context, 
+    code: str, 
+    framework: str = "FastAPI",
+    output_format: Literal["openapi", "swagger", "markdown", "code"] = "openapi",
+    client_language: str = "Python",
+    model: str = DEFAULT_MODEL
+) -> str:
+    """Generate API documentation or client code from API implementation code.
+    
+    Args:
+        ctx: The FastMCP context.
+        code: The API implementation code to document.
+        framework: The web framework used (e.g., 'FastAPI', 'Flask', 'Express').
+        output_format: The desired documentation format ('openapi', 'swagger', 'markdown', or 'code').
+        client_language: The language for client code generation (when output_format is 'code').
+        model: The OpenAI model to use.
+    
+    Returns:
+        Generated API documentation or client code based on the specified format.
+    """
+    logger.info("TOOL REQUEST: generate_api_docs - framework=%s, output_format=%s, model=%s", 
+                framework, output_format, model)
+    
+    template = _load_prompt("generate_api_docs")
+    
+    prompt = template.format(
+        code=code.strip(),
+        framework=framework,
+        output_format=output_format,
+        client_language=client_language
+    )
+    
     return await _query_codex(ctx, prompt, model=model)
