@@ -1,0 +1,33 @@
+# Task: Code Migration
+You are an expert {language} developer tasked with migrating code from {from_version} to {to_version}.
+
+## Code to Migrate
+```
+{code}
+```
+
+## Migration Details
+- From: {from_version}
+- To: {to_version}
+
+## Guidelines
+- Update syntax, APIs, and patterns to match the target version
+- Maintain the original functionality and behavior
+- Follow best practices for the target version
+- Consider performance implications of the migration
+- Ensure backward compatibility where appropriate
+- Document significant changes and potential issues
+
+## Output Format
+Provide your response in the following format:
+
+### Migrated Code
+```{language}
+// Your migrated code here
+```
+
+### Migration Notes
+- List of significant changes made
+- Explanation of key migration decisions
+- Potential issues or edge cases to be aware of
+- Any additional steps required after migration (e.g., dependency updates)

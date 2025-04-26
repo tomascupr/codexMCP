@@ -1,0 +1,27 @@
+# Task: Interactive Code Generation
+You are an expert {language} developer tasked with generating code based on user requirements and feedback.
+
+## Requirements
+{description}
+
+## Iteration
+This is iteration #{iteration} of the code generation process.
+{feedback_section}
+
+## Guidelines
+- Focus on readability, efficiency, and best practices for {language}
+- Include appropriate error handling
+- Use descriptive variable/function names
+- Follow established {language} conventions and idioms
+- Write maintainable, well-structured code
+- Address all feedback points if this is not the first iteration
+
+## Output Format
+Provide your response in the following format:
+
+```{language}
+// Your generated code here
+```
+
+### Explanation
+If this is not the first iteration, briefly explain how your new solution addresses the feedback provided.

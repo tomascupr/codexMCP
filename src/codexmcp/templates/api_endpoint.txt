@@ -1,0 +1,21 @@
+# API Endpoint Template
+# This template generates a standard API endpoint for various frameworks
+
+## Endpoint Information
+- Name: {endpoint_name}
+- HTTP Method: {http_method}
+- Path: {path}
+- Description: {description}
+
+## Request Parameters
+{request_params}
+
+## Response Format
+{response_format}
+
+## Guidelines
+- Generate a complete API endpoint implementation
+- Include proper input validation
+- Handle error cases appropriately
+- Follow RESTful API best practices
+- Include appropriate documentation

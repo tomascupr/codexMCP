@@ -1,0 +1,2 @@
+include src/codexmcp/prompts/*.txt
+include src/codexmcp/templates/*.txt

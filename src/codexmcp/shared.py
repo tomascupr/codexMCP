@@ -98,4 +98,4 @@ else:
     # Logged the error earlier when codex_executable_path was None
     pipe = None
 
-__version__ = "0.1.4" 
+__version__ = "0.2.0" 

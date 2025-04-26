@@ -10,6 +10,38 @@ Think of CodexMCP as a bridge between your application and OpenAI's powerful AI 
 
 A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/openai/codex) to provide AI code generation, refactoring, and documentation capabilities through a standardized API.
 
+## New Features
+
+CodexMCP has been enhanced with several high-leverage improvements:
+
+### 1. Context-Aware Code Analysis
+
+The new `analyze_code_context` tool allows you to analyze code with awareness of its surrounding context, including related files. This provides deeper insights into how code fits into the broader architecture.
+
+### 2. Interactive Code Generation with Feedback Loop
+
+The `interactive_code_generation` tool enables an iterative approach to code generation, where you can provide feedback on previous iterations to refine the results.
+
+### 3. Advanced Code Quality Assessment
+
+The `assess_code_quality` tool provides detailed code quality assessments with actionable suggestions for improvement, focusing on specific areas like performance, readability, or security.
+
+### 4. Intelligent Code Search
+
+The `search_codebase` tool allows you to search and analyze code across multiple files using natural language queries, making it easier to navigate large codebases.
+
+### 5. Audience-Targeted Code Explanations
+
+The `explain_code_for_audience` tool provides code explanations tailored to different audiences (developers, managers, beginners) with customizable detail levels.
+
+### 6. Code Migration and Modernization
+
+The `migrate_code` tool helps you migrate code between different language versions or frameworks, with explanations of the changes made.
+
+### 7. Template-Based Code Generation
+
+The `generate_from_template` tool enables code generation using customizable templates, increasing productivity for common tasks.
+
 ## Installation
 
 1. **Prerequisites**:
@@ -76,37 +108,99 @@ This approach gives you the power of AI coding assistance while keeping your app
 
 CodexMCP provides the following AI-powered tools:
 
+#### Core Code Generation Tools
+
 1. **generate_code**: Generate code in any programming language
    - `description`: Task description
    - `language`: Programming language (default: "Python")
+   - `model`: OpenAI model to use (default: "o4-mini")
 
-2. **refactor_code**: Improve existing code
-   - `code`: Source code to refactor
-   - `instruction`: How to refactor the code
+2. **interactive_code_generation**: Generate code with an iterative feedback loop
+   - `description`: Task description
+   - `language`: Programming language (default: "Python")
+   - `feedback`: Feedback on previous iterations
+   - `iteration`: Current iteration number (default: 1)
+   - `model`: OpenAI model to use (default: "o4-mini")
 
-3. **write_tests**: Generate unit tests for code
+3. **generate_from_template**: Generate code using customizable templates
+   - `template_name`: Name of the template to use
+   - `parameters`: Dictionary of parameters to fill in the template
+   - `language`: Programming language (default: "Python")
+   - `model`: OpenAI model to use (default: "o4-mini")
+
+#### Code Analysis Tools
+
+4. **explain_code_for_audience**: Explain code with customized detail level for different audiences
+   - `code`: Source code to explain
+   - `audience`: Target audience (e.g., "developer", "manager", "beginner")
+   - `detail_level`: Level of detail ("brief", "medium", "detailed")
+   - `model`: OpenAI model to use (default: "o4-mini")
+
+5. **assess_code_quality**: Assess code quality and provide improvement suggestions
+   - `code`: Source code to assess
+   - `language`: Programming language (default: "Python")
+   - `focus_areas`: Specific areas to focus on (e.g., "performance", "readability", "security")
+   - `model`: OpenAI model to use (default: "o4-mini")
+
+6. **analyze_code_context**: Analyze code with awareness of its surrounding context
+   - `code`: Source code to analyze
+   - `file_path`: Path to the file containing the code (for context)
+   - `surrounding_files`: List of related file paths to consider for context
+   - `model`: OpenAI model to use (default: "o4-mini")
+
+7. **search_codebase**: Search and analyze code across multiple files based on natural language query
+   - `query`: Natural language search query
+   - `file_patterns`: File patterns to include in search (default: ["*.py", "*.js", "*.ts"])
+   - `max_results`: Maximum number of results to return (default: 5)
+   - `model`: OpenAI model to use (default: "o4-mini")
+
+#### Code Transformation Tools
+
+8. **migrate_code**: Migrate code between different language versions or frameworks
+   - `code`: Source code to migrate
+   - `from_version`: Source version/framework (e.g., "Python 2", "React 16")
+   - `to_version`: Target version/framework (e.g., "Python 3", "React 18")
+   - `language`: Base programming language (default: "Python")
+   - `model`: OpenAI model to use (default: "o4-mini")
+
+9. **write_tests**: Generate unit tests for code
    - `code`: Source code to test
    - `description`: Additional testing requirements
+   - `model`: OpenAI model to use (default: "o4-mini")
 
-4. **explain_code**: Explain code functionality and structure
-   - `code`: Source code to explain
-   - `detail_level`: Level of detail ("brief", "medium", "detailed")
+#### Documentation Tools
 
-5. **generate_docs**: Create documentation for code
-   - `code`: Source code to document
-   - `doc_format`: Output format ("docstring", "markdown", "html")
+10. **generate_docs**: Create documentation for code
+    - `code`: Source code to document
+    - `doc_format`: Output format ("docstring", "markdown", "html")
+    - `model`: OpenAI model to use (default: "o4-mini")
 
-6. **write_openai_agent**: Generate an OpenAI Agent implementation
-   - `name`: Agent name
-   - `instructions`: Agent system prompt
-   - `tool_functions`: List of tool descriptions
-   - `description`: Additional agent details
+11. **generate_api_docs**: Generate API documentation or client code
+    - `code`: API implementation code
+    - `framework`: Web framework used (default: "FastAPI")
+    - `output_format`: Output format ("openapi", "swagger", "markdown", "code")
+    - `client_language`: Language for client code (when output_format is "code")
+    - `model`: OpenAI model to use (default: "o4-mini")
 
-7. **generate_api_docs**: Generate API documentation or client code
-   - `code`: API implementation code
-   - `framework`: Web framework used (default: "FastAPI")
-   - `output_format`: Output format ("openapi", "swagger", "markdown", "code")
-   - `client_language`: Language for client code (when output_format is "code")
+#### Agent Generation Tools
+
+12. **write_openai_agent**: Generate an OpenAI Agent implementation
+    - `name`: Agent name
+    - `instructions`: Agent system prompt
+    - `tool_functions`: List of tool descriptions
+    - `description`: Additional agent details
+    - `model`: OpenAI model to use (default: "o4-mini")
+
+### Deprecated Tools
+
+The following tools are deprecated and will be removed in a future version:
+
+1. **refactor_code**: Deprecated in favor of `assess_code_quality` and `migrate_code`
+   - For code quality improvements, use `assess_code_quality`
+   - For version/framework migrations, use `migrate_code`
+
+2. **explain_code**: Deprecated in favor of `explain_code_for_audience`
+   - Use `explain_code_for_audience` with appropriate audience and detail level parameters
 
 ### Example Client
 
@@ -122,7 +216,27 @@ async def main():
         description="Create a function to calculate Fibonacci numbers",
         language="Python"
     )
+    print("Generated code:")
     print(code)
+    
+    # Use interactive code generation with feedback
+    improved_code = await client.interactive_code_generation(
+        description="Create a function to calculate Fibonacci numbers",
+        language="Python",
+        feedback="The solution works but could be more efficient with memoization",
+        iteration=2
+    )
+    print("\nImproved code with feedback:")
+    print(improved_code)
+    
+    # Assess code quality
+    quality_assessment = await client.assess_code_quality(
+        code=improved_code,
+        language="Python",
+        focus_areas=["performance", "readability"]
+    )
+    print("\nCode quality assessment:")
+    print(quality_assessment)
     
     # Generate API documentation
     api_code = """
@@ -138,12 +252,39 @@ async def main():
         return results
     """
     
+    # Explain code for different audiences
+    explanation = await client.explain_code_for_audience(
+        code=api_code,
+        audience="manager",
+        detail_level="brief"
+    )
+    print("\nCode explanation for managers:")
+    print(explanation)
+    
+    # Generate API documentation
     docs = await client.generate_api_docs(
         code=api_code,
         framework="FastAPI",
         output_format="openapi"
     )
+    print("\nAPI documentation:")
     print(docs)
+    
+    # Generate code from template
+    template_code = await client.generate_from_template(
+        template_name="api_endpoint",
+        parameters={
+            "endpoint_name": "create_user",
+            "http_method": "POST",
+            "path": "/users",
+            "description": "Create a new user in the system",
+            "request_params": "username: str, email: str, password: str",
+            "response_format": "JSON with user ID and creation timestamp"
+        },
+        language="Python"
+    )
+    print("\nTemplate-based code generation:")
+    print(template_code)
 
 if __name__ == "__main__":
     asyncio.run(main())
