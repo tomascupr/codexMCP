@@ -90,6 +90,11 @@ The `generate_from_template` tool enables code generation using customizable tem
      - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "o4-mini").
      - `CODEXMCP_LOG_LEVEL`: Logging level (default: INFO).
      - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: true).
+     - `CODEXMCP_CACHE_ENABLED`: Enable response caching (default: true).
+     - `CODEXMCP_CACHE_TTL`: Cache time-to-live in seconds (default: 3600).
+     - `CODEXMCP_MAX_RETRIES`: Maximum retry attempts for API calls (default: 3).
+     - `CODEXMCP_RETRY_BACKOFF`: Exponential backoff factor for retries (default: 2.0).
+     - `CODEXMCP_USE_CLI`: Whether to use Codex CLI when available (default: true).
 
 ## Usage
 
@@ -303,6 +308,32 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+## Advanced Features
+
+CodexMCP includes several advanced features to enhance reliability and performance:
+
+### Response Caching
+
+Identical prompts are automatically cached to improve response time and reduce API costs:
+
+- Set `CODEXMCP_CACHE_ENABLED=0` to disable caching
+- Configure cache timeout with `CODEXMCP_CACHE_TTL=3600` (in seconds)
+
+### Error Handling & Retries
+
+The system automatically retries failed API calls with exponential backoff:
+
+- Configure with `CODEXMCP_MAX_RETRIES=3` and `CODEXMCP_RETRY_BACKOFF=2.0`
+- Error IDs are included in error messages for easier debugging
+- Specific error types help diagnose issues (rate limits, timeouts, etc.)
+
+### Provider Flexibility
+
+Choose between Codex CLI and direct API access:
+
+- Set `CODEXMCP_USE_CLI=0` to force using the API even when CLI is available
+- Direct API access includes streaming support and better error handling
 
 ## Testing
 

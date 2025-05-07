@@ -1,4 +1,4 @@
-"""Shared singletons (mcp, pipe) for CodexMCP."""
+"""Shared singletons (mcp, pipe, config) for CodexMCP."""
 
 from __future__ import annotations
 
@@ -39,9 +39,8 @@ from .pipe import CodexPipe
 console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in ("1", "true", "yes", "on")
 logger = configure_logging(console=console_logging)
 
-# Default model configuration
-DEFAULT_MODEL = os.environ.get("CODEXMCP_DEFAULT_MODEL", "o4-mini")
-logger.info("Default model set to: %s (override with CODEXMCP_DEFAULT_MODEL env var)", DEFAULT_MODEL)
+# Import config
+from .config import config
 
 # ---------------------------------------------------------------------------
 # Shared singletons
@@ -51,6 +50,14 @@ logger.info("Initializing shared MCP instance...")
 mcp = FastMCP("CodexMCP")
 logger.info("Shared MCP instance initialized.")
 
+# Import components after config is initialized
+from .client import LLMClient
+from .prompts import prompts
+
+# Pre-initialize client
+client = LLMClient()
+logger.info("Initialized LLM client")
+
 pipe: CodexPipe | None = None
 
 # -----------------------------------------------------------
@@ -58,18 +65,18 @@ pipe: CodexPipe | None = None
 # -----------------------------------------------------------
 
 # Locate `codex` executable.  If it is unavailable we fall back to
-# runtime-level fallbacks implemented in *tools.py* (e.g. OpenAI SDK).
+# using the LLMClient directly.
 
 codex_executable_path = shutil.which("codex")
 
 if not codex_executable_path:
     logger.warning(
         "'codex' executable not found – Codex CLI features disabled. "
-        "The library will attempt to fall back to the OpenAI Chat API."
+        "The library will use the LLM Client API interface instead."
     )
     CODEX_CMD = None  # CodexPipe will not be initialised
 else:
-    logger.info("Found 'codex' executable at: %s", codex_executable_path)
+    logger.info(f"Found 'codex' executable at: {codex_executable_path}")
     CODEX_CMD = [
         codex_executable_path,
         "--json",
@@ -83,27 +90,27 @@ else:
 
 # Set environment variable before creating the pipe
 os.environ["CODEX_ALLOW_DIRTY"] = "1"
-# OPENAI_API_KEY is handled within CodexPipe initialization in pipe.py
 
-# Initialize CodexPipe only if the command was found
-if CODEX_CMD:
+# Initialize CodexPipe only if the command was found and CLI usage is enabled
+if CODEX_CMD and os.environ.get("CODEXMCP_USE_CLI", "1").lower() in ("1", "true", "yes"):
     try:
         logger.info("Initializing shared CodexPipe instance...")
         pipe = CodexPipe(CODEX_CMD)
         logger.info("Shared CodexPipe instance initialized.")
         # Discard the first response
-        logger.info("Attempting to discard dummy prompt response in shared...")
+        logger.info("Attempting to discard dummy prompt response...")
         try:
             # Consider making this non-blocking if it causes startup delays
             _ = pipe.process.stdout.readline()
-            logger.info("Dummy prompt response discarded in shared.")
+            logger.info("Dummy prompt response discarded.")
         except Exception as e_read:
-            logger.warning("Could not read/discard dummy prompt response in shared: %s", e_read)
-    except Exception as e_pipe: # Catch generic exceptions during pipe init
-        logger.error("Failed to initialize shared CodexPipe with command '%s': %s", " ".join(CODEX_CMD), e_pipe, exc_info=True)
-        pipe = None # Ensure pipe is None if initialization fails
+            logger.warning(f"Could not read/discard dummy prompt response: {e_read}")
+    except Exception as e_pipe:  # Catch generic exceptions during pipe init
+        logger.error(f"Failed to initialize CodexPipe with command '{' '.join(CODEX_CMD)}': {e_pipe}", exc_info=True)
+        pipe = None  # Ensure pipe is None if initialization fails
 else:
     # Logged the error earlier when codex_executable_path was None
+    logger.info("CodexPipe not initialized. Using LLM client exclusively.")
     pipe = None
 
-__version__ = "0.2.0" 
+__version__ = "0.2.0"

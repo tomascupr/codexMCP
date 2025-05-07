@@ -184,3 +184,5 @@ server_config.json
 
 # General log files
 *.log
+
+**/.claude/settings.local.json

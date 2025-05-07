@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover – only executed when dependency missin
 
 from fastmcp import Context, exceptions
 
-from .logging_cfg import logger
+# Local imports
 from .client import LLMClient
 from .config import config
 from .exceptions import (
@@ -33,6 +33,7 @@ from .exceptions import (
     CodexModelUnavailableError,
     CodexConnectionError,
 )
+from .logging_cfg import logger
 from .shared import mcp, pipe  # Import from shared
 from .prompts import prompts
 
@@ -220,9 +221,9 @@ async def assess_code_quality(ctx: Context, code: str, language: str = "Python",
         
         # Get formatted prompt using prompt manager
         prompt = prompts.get("assess_code_quality", 
-                            code=code.strip(), 
-                            language=language, 
-                            focus_areas=focus_areas_text)
+                           code=code.strip(), 
+                           language=language, 
+                           focus_areas=focus_areas_text)
         
         # Pass to enhanced query function
         return await _query_codex(ctx, prompt, model=model)
@@ -250,15 +251,15 @@ async def migrate_code(ctx: Context, code: str, from_version: str, to_version: s
     """
     model = model or config.default_model
     logger.info("TOOL REQUEST: migrate_code - from=%s, to=%s, model=%s", 
-                from_version, to_version, model)
+               from_version, to_version, model)
     
     try:
         # Get formatted prompt using prompt manager
         prompt = prompts.get("migrate_code", 
-                            code=code.strip(),
-                            from_version=from_version,
-                            to_version=to_version,
-                            language=language)
+                           code=code.strip(),
+                           from_version=from_version,
+                           to_version=to_version,
+                           language=language)
         
         # Pass to enhanced query function
         return await _query_codex(ctx, prompt, model=model)
@@ -337,8 +338,8 @@ async def write_tests(ctx: Context, code: str, description: str = "", model: str
         
         # Get formatted prompt using prompt manager
         prompt = prompts.get("write_tests", 
-                            code=code.strip(), 
-                            description=desc_section)
+                           code=code.strip(), 
+                           description=desc_section)
         
         # Pass to enhanced query function
         return await _query_codex(ctx, prompt, model=model)
@@ -365,7 +366,7 @@ async def explain_code_for_audience(ctx: Context, code: str, audience: str = "de
     """
     model = model or config.default_model
     logger.info("TOOL REQUEST: explain_code_for_audience - audience=%s, detail_level=%s, model=%s", 
-                audience, detail_level, model)
+               audience, detail_level, model)
     
     try:
         # Validate detail level
@@ -375,9 +376,9 @@ async def explain_code_for_audience(ctx: Context, code: str, audience: str = "de
         
         # Get formatted prompt using prompt manager
         prompt = prompts.get("explain_code_for_audience", 
-                            code=code.strip(),
-                            audience=audience,
-                            detail_level=detail_level)
+                           code=code.strip(),
+                           audience=audience,
+                           detail_level=detail_level)
         
         # Pass to enhanced query function
         return await _query_codex(ctx, prompt, model=model)
@@ -427,8 +428,8 @@ async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", 
         
         # Get formatted prompt using prompt manager
         prompt = prompts.get("generate_docs", 
-                            code=code.strip(),
-                            doc_format=doc_format)
+                           code=code.strip(),
+                           doc_format=doc_format)
         
         # Pass to enhanced query function
         return await _query_codex(ctx, prompt, model=model)
@@ -546,7 +547,7 @@ async def interactive_code_generation(ctx: Context, description: str, language: 
     """
     model = model or config.default_model
     logger.info("TOOL REQUEST: interactive_code_generation - language=%s, iteration=%d, model=%s", 
-                language, iteration, model)
+               language, iteration, model)
     
     try:
         # Adjust prompt based on whether this is the first iteration or a refinement
@@ -588,7 +589,7 @@ async def generate_from_template(ctx: Context, template_name: str, parameters: D
     """
     model = model or config.default_model
     logger.info("TOOL REQUEST: generate_from_template - template=%s, language=%s, model=%s", 
-                template_name, language, model)
+               template_name, language, model)
     
     try:
         # Load the template - this could be from a templates directory
@@ -751,7 +752,7 @@ async def generate_api_docs(
     """
     model = model or config.default_model
     logger.info("TOOL REQUEST: generate_api_docs - framework=%s, output_format=%s, model=%s", 
-                framework, output_format, model)
+               framework, output_format, model)
     
     try:
         # Validate output_format
