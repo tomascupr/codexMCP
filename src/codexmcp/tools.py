@@ -7,25 +7,34 @@ import os
 import tempfile
 import importlib.resources  # Use importlib.resources
 from typing import Any, Dict, List, Literal, Optional
+import uuid
+
+# ---------------------------------------------------------------------------
+# Optional OpenAI SDK import (lazy fallback when Codex CLI absent)
+# ---------------------------------------------------------------------------
+
+try:
+    # The official OpenAI Python client v1.x exposes AsyncOpenAI
+    import openai  # type: ignore
+
+    _OPENAI_SDK_AVAILABLE = True
+except ImportError:  # pragma: no cover – only executed when dependency missing
+    _OPENAI_SDK_AVAILABLE = False
 
 from fastmcp import Context, exceptions
 
 from .logging_cfg import logger
-from .shared import mcp, pipe, DEFAULT_MODEL  # Import DEFAULT_MODEL
-
-
-# Helper to load prompts
-def _load_prompt(name: str) -> str:
-    try:
-        # Assumes prompts are in a 'prompts' subdirectory relative to this file's package
-        return importlib.resources.read_text(__package__ + '.prompts', f"{name}.txt")
-    except FileNotFoundError as exc:
-        logger.error("Prompt file '%s.txt' not found in package '%s.prompts'", name, __package__, exc_info=True)
-        # Fallback or raise a more specific error
-        raise exceptions.ToolError(f"Internal server error: Missing prompt template '{name}'.") from exc
-    except Exception as exc:
-        logger.error("Failed to load prompt '%s': %s", name, exc, exc_info=True)
-        raise exceptions.ToolError(f"Internal server error: Could not load prompt template '{name}'.") from exc
+from .client import LLMClient
+from .config import config
+from .exceptions import (
+    CodexBaseError,
+    CodexRateLimitError,
+    CodexTimeoutError,
+    CodexModelUnavailableError,
+    CodexConnectionError,
+)
+from .shared import mcp, pipe  # Import from shared
+from .prompts import prompts
 
 
 # Helper to load templates
@@ -45,40 +54,148 @@ def _load_template(name: str) -> str:
         raise exceptions.ToolError(f"Internal server error: Could not load template '{name}'.") from exc
 
 
-async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str: # model is now required here
+# Keep original _load_prompt function for backward compatibility
+def _load_prompt(name: str) -> str:
+    """Legacy helper to load prompts."""
+    try:
+        return prompts.get(name)
+    except ValueError as exc:
+        logger.error("Prompt file '%s.txt' not found", name, exc_info=True)
+        raise exceptions.ToolError(f"Internal server error: Missing prompt template '{name}'.") from exc
+    except Exception as exc:
+        logger.error("Failed to load prompt '%s': %s", name, exc, exc_info=True)
+        raise exceptions.ToolError(f"Internal server error: Could not load prompt template '{name}'.") from exc
+
+
+async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str:
+    """Enhanced LLM helper with reliability improvements.
+    
+    Preference order:
+        1. Codex CLI via the long-lived ``pipe`` singleton (if available)
+        2. OpenAI API via LLMClient (with caching and retries)
+    
+    Args:
+        ctx: FastMCP context object
+        prompt: The formatted prompt to send to the model
+        model: The model identifier to use
+        
+    Returns:
+        Processed text response from the model
+        
+    Raises:
+        CodexBaseError: When generation fails for any reason
+    """
+    # Generate a unique error ID for traceability
+    error_id = uuid.uuid4().hex[:8]
+    
+    # Report progress to client
+    if hasattr(ctx, "progress"):
+        await ctx.progress("Generating response...")
+    
+    try:
+        # ------------------------------------------------------------------
+        # 1. Codex CLI path - if available
+        # ------------------------------------------------------------------
+        if pipe is not None:
+            try:
+                return await _query_codex_via_pipe(ctx, prompt, model=model)
+            except Exception as e:
+                logger.warning(
+                    f"Codex CLI path failed (error_id={error_id}): {str(e)}. Falling back to API."
+                )
+                # Continue to API fallback
+        
+        # ------------------------------------------------------------------
+        # 2. LLM Client path with retries and caching
+        # ------------------------------------------------------------------
+        # Initialize the client (singleton pattern ensures only one instance)
+        client = LLMClient()
+        
+        # Configure params based on our config
+        params = {
+            "model": model,
+            "temperature": config.default_temperature,
+            "max_tokens": config.default_max_tokens,
+        }
+        
+        # Generate with advanced client
+        response = await client.generate(prompt, **params)
+        return response.strip()
+            
+    except Exception as e:
+        # Enhanced error capturing with classification
+        logger.error(f"Generation error {error_id}: {str(e)}", exc_info=True)
+        
+        # Classify the error
+        if "rate limit" in str(e).lower():
+            raise CodexRateLimitError(
+                "Rate limit exceeded. Please try again later.", error_id
+            )
+        elif "timeout" in str(e).lower():
+            raise CodexTimeoutError(
+                "Request timed out. Please try again.", error_id
+            )
+        elif "model" in str(e).lower() and ("not found" in str(e).lower() or "unavailable" in str(e).lower()):
+            raise CodexModelUnavailableError(
+                f"Model '{model}' is unavailable. Try a different model.", error_id
+            ) 
+        elif "connect" in str(e).lower():
+            raise CodexConnectionError(
+                "Failed to connect to the provider. Check your internet connection.", error_id
+            )
+        else:
+            # Generic error with traceable ID
+            raise CodexBaseError(
+                f"Failed to generate response: {str(e)}", error_id
+            )
+
+
+async def _query_codex_via_pipe(ctx: Context, prompt: str, *, model: str) -> str:
+    """Query the Codex CLI using the pipe interface."""
     if pipe is None:
-        raise exceptions.ToolError("CodexPipe is not initialized. Cannot query Codex.")
-
+        raise CodexBaseError("Codex CLI is not initialized")
+        
     request = {"prompt": prompt, "model": model}
-
     await pipe.send(request)
 
     try:
         raw = await pipe.recv(progress_cb=getattr(ctx, "progress", None))
         response: dict[str, Any] = json.loads(raw)
     except json.JSONDecodeError as exc:
-        logger.exception("Failed to decode Codex JSON: %s", raw)
-        raise exceptions.ToolError("Codex returned invalid JSON.") from exc
+        logger.exception("Failed to decode Codex JSON response")
+        raise CodexBaseError("Codex returned invalid JSON") from exc
 
-    for key in ("completion", "text", "response"):
+    # Process response in consistent order
+    response_keys = ["completion", "text", "response"]
+    for key in response_keys:
         if key in response:
             return str(response[key]).lstrip("\n")
 
-    logger.error("Unexpected Codex response: %s", response)
-    raise exceptions.ToolError("Codex response missing `completion` field.")
+    logger.error("Unexpected Codex response structure: %s", response)
+    raise CodexBaseError("Codex response missing expected fields")
 
 
 @mcp.tool()
-async def generate_code(ctx: Context, description: str, language: str = "Python", model: str = DEFAULT_MODEL) -> str:
+async def generate_code(ctx: Context, description: str, language: str = "Python", model: str = None) -> str:
     """Generate *language* source code that fulfils *description*."""
+    model = model or config.default_model
     logger.info("TOOL REQUEST: generate_code - language=%s, model=%s", language, model)
-    template = _load_prompt("generate_code")
-    prompt = template.format(language=language, description=description)
-    return await _query_codex(ctx, prompt, model=model)
+    
+    try:
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get("generate_code", language=language, description=description)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to generate code: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code generation failed: {str(e)}")
 
 
 @mcp.tool()
-async def assess_code_quality(ctx: Context, code: str, language: str = "Python", focus_areas: List[str] = [], model: str = DEFAULT_MODEL) -> str:
+async def assess_code_quality(ctx: Context, code: str, language: str = "Python", focus_areas: List[str] = [], model: str = None) -> str:
     """Assess code quality and provide improvement suggestions.
     
     Args:
@@ -91,27 +208,33 @@ async def assess_code_quality(ctx: Context, code: str, language: str = "Python",
     Returns:
         Code quality assessment with actionable improvement suggestions.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: assess_code_quality - language=%s, model=%s", language, model)
     
-    template = _load_prompt("assess_code_quality")
-    
-    # Format focus areas for the prompt
-    focus_areas_text = ""
-    if focus_areas:
-        focus_areas_text = "\n\n## Focus Areas\nPlease pay special attention to these aspects:\n"
-        focus_areas_text += "\n".join([f"- {area}" for area in focus_areas])
-    
-    prompt = template.format(
-        code=code.strip(),
-        language=language,
-        focus_areas=focus_areas_text
-    )
-    
-    return await _query_codex(ctx, prompt, model=model)
+    try:
+        # Format focus areas for the prompt
+        focus_areas_text = ""
+        if focus_areas:
+            focus_areas_text = "\n\n## Focus Areas\nPlease pay special attention to these aspects:\n"
+            focus_areas_text += "\n".join([f"- {area}" for area in focus_areas])
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get("assess_code_quality", 
+                            code=code.strip(), 
+                            language=language, 
+                            focus_areas=focus_areas_text)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to assess code quality: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code quality assessment failed: {str(e)}")
 
 
 @mcp.tool()
-async def migrate_code(ctx: Context, code: str, from_version: str, to_version: str, language: str = "Python", model: str = DEFAULT_MODEL) -> str:
+async def migrate_code(ctx: Context, code: str, from_version: str, to_version: str, language: str = "Python", model: str = None) -> str:
     """Migrate code between different language versions or frameworks.
     
     Args:
@@ -125,27 +248,35 @@ async def migrate_code(ctx: Context, code: str, from_version: str, to_version: s
     Returns:
         Migrated code with explanation of changes.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: migrate_code - from=%s, to=%s, model=%s", 
                 from_version, to_version, model)
     
-    template = _load_prompt("migrate_code")
-    prompt = template.format(
-        code=code.strip(),
-        from_version=from_version,
-        to_version=to_version,
-        language=language
-    )
-    
-    return await _query_codex(ctx, prompt, model=model)
+    try:
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get("migrate_code", 
+                            code=code.strip(),
+                            from_version=from_version,
+                            to_version=to_version,
+                            language=language)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to migrate code: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code migration failed: {str(e)}")
 
 
 @mcp.tool()
-async def refactor_code(ctx: Context, code: str, instruction: str, model: str = DEFAULT_MODEL) -> str:
+async def refactor_code(ctx: Context, code: str, instruction: str, model: str = None) -> str:
     """[DEPRECATED] Refactor *code* as per *instruction*.
     
     This tool is deprecated and will be removed in a future version.
     Please use `assess_code_quality` or `migrate_code` instead.
     """
+    model = model or config.default_model
     logger.warning("DEPRECATION WARNING: 'refactor_code' is deprecated. Use 'assess_code_quality' or 'migrate_code' instead.")
     
     # Determine which new tool to use based on the instruction
@@ -195,18 +326,31 @@ async def refactor_code(ctx: Context, code: str, instruction: str, model: str = 
 
 
 @mcp.tool()
-async def write_tests(ctx: Context, code: str, description: str = "", model: str = DEFAULT_MODEL) -> str:
+async def write_tests(ctx: Context, code: str, description: str = "", model: str = None) -> str:
     """Generate unit tests for *code*."""
+    model = model or config.default_model
     logger.info("TOOL REQUEST: write_tests - model=%s", model)
-    template = _load_prompt("write_tests")
-    # Handle optional description formatting
-    desc_section = f"\n\n## Additional Context\n{description}" if description else ""
-    prompt = template.format(code=code.strip(), description=desc_section)
-    return await _query_codex(ctx, prompt, model=model)
+    
+    try:
+        # Format description section
+        desc_section = f"\n\n## Additional Context\n{description}" if description else ""
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get("write_tests", 
+                            code=code.strip(), 
+                            description=desc_section)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to write tests: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Test generation failed: {str(e)}")
 
 
 @mcp.tool()
-async def explain_code_for_audience(ctx: Context, code: str, audience: str = "developer", detail_level: str = "medium", model: str = DEFAULT_MODEL) -> str:
+async def explain_code_for_audience(ctx: Context, code: str, audience: str = "developer", detail_level: str = "medium", model: str = None) -> str:
     """Explain code with customized detail level for different audiences.
     
     Args:
@@ -219,21 +363,33 @@ async def explain_code_for_audience(ctx: Context, code: str, audience: str = "de
     Returns:
         Code explanation tailored to the specified audience and detail level.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: explain_code_for_audience - audience=%s, detail_level=%s, model=%s", 
                 audience, detail_level, model)
     
-    template = _load_prompt("explain_code_for_audience")
-    prompt = template.format(
-        code=code.strip(),
-        audience=audience,
-        detail_level=detail_level
-    )
-    
-    return await _query_codex(ctx, prompt, model=model)
+    try:
+        # Validate detail level
+        if detail_level not in ["brief", "medium", "detailed"]:
+            detail_level = "medium"  # Default to medium if invalid
+            logger.warning(f"Invalid detail_level '{detail_level}', defaulting to 'medium'")
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get("explain_code_for_audience", 
+                            code=code.strip(),
+                            audience=audience,
+                            detail_level=detail_level)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to explain code: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code explanation failed: {str(e)}")
 
 
 @mcp.tool()
-async def explain_code(ctx: Context, code: str, detail_level: str = "medium", model: str = DEFAULT_MODEL) -> str:
+async def explain_code(ctx: Context, code: str, detail_level: str = "medium", model: str = None) -> str:
     """[DEPRECATED] Explain the functionality and structure of the provided *code*.
     
     This tool is deprecated and will be removed in a future version.
@@ -241,6 +397,7 @@ async def explain_code(ctx: Context, code: str, detail_level: str = "medium", mo
     
     The *detail_level* can be 'brief', 'medium', or 'detailed'.
     """
+    model = model or config.default_model
     logger.warning("DEPRECATION WARNING: 'explain_code' is deprecated. Use 'explain_code_for_audience' instead.")
     
     # Call the new tool with appropriate defaults
@@ -254,19 +411,36 @@ async def explain_code(ctx: Context, code: str, detail_level: str = "medium", mo
 
 
 @mcp.tool()
-async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", model: str = DEFAULT_MODEL) -> str:
+async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", model: str = None) -> str:
     """Generate documentation for the provided *code*.
     
     The *doc_format* can be 'docstring', 'markdown', or 'html'.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: generate_docs - doc_format=%s, model=%s", doc_format, model)
-    template = _load_prompt("generate_docs")
-    prompt = template.format(code=code.strip(), doc_format=doc_format)
-    return await _query_codex(ctx, prompt, model=model)
+    
+    try:
+        # Validate doc_format
+        if doc_format not in ["docstring", "markdown", "html"]:
+            doc_format = "docstring"  # Default if invalid
+            logger.warning(f"Invalid doc_format '{doc_format}', defaulting to 'docstring'")
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get("generate_docs", 
+                            code=code.strip(),
+                            doc_format=doc_format)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to generate docs: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Documentation generation failed: {str(e)}")
 
 
 @mcp.tool()
-async def write_openai_agent(ctx: Context, name: str, instructions: str, tool_functions: List[str] = [], description: str = "", model: str = DEFAULT_MODEL) -> str:
+async def write_openai_agent(ctx: Context, name: str, instructions: str, tool_functions: List[str] = [], description: str = "", model: str = None) -> str:
     """Generate Python code for an OpenAI Agent using the `openai-agents` SDK.
 
     Args:
@@ -277,25 +451,35 @@ async def write_openai_agent(ctx: Context, name: str, instructions: str, tool_fu
         description: Optional additional details about the agent's behavior or tool implementation.
         model: The OpenAI model to use (e.g., 'o4-mini', 'gpt-4').
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: write_openai_agent - name=%s, model=%s", name, model)
-    template = _load_prompt("write_openai_agent")
-
-    # Format the tool functions list for the prompt
-    formatted_tool_funcs = "\n".join([f"- {func_desc}" for func_desc in tool_functions])
-    if not formatted_tool_funcs:
-        formatted_tool_funcs = "# No tools specified."
-
-    prompt = template.format(
-        name=name,
-        instructions=instructions.strip(),
-        tool_functions=formatted_tool_funcs,
-        description=description.strip()
-    )
-    return await _query_codex(ctx, prompt, model=model)
+    
+    try:
+        # Format the tool functions list for the prompt
+        formatted_tool_funcs = "\n".join([f"- {func_desc}" for func_desc in tool_functions])
+        if not formatted_tool_funcs:
+            formatted_tool_funcs = "# No tools specified."
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get(
+            "write_openai_agent",
+            name=name,
+            instructions=instructions.strip(),
+            tool_functions=formatted_tool_funcs,
+            description=description.strip()
+        )
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to generate agent code: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Agent code generation failed: {str(e)}")
 
 
 @mcp.tool()
-async def analyze_code_context(ctx: Context, code: str, file_path: str = "", surrounding_files: List[str] = [], model: str = DEFAULT_MODEL) -> str:
+async def analyze_code_context(ctx: Context, code: str, file_path: str = "", surrounding_files: List[str] = [], model: str = None) -> str:
     """Analyze code with awareness of its surrounding context.
     
     Args:
@@ -308,35 +492,45 @@ async def analyze_code_context(ctx: Context, code: str, file_path: str = "", sur
     Returns:
         Analysis with context-aware insights and suggestions.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: analyze_code_context - model=%s", model)
-    template = _load_prompt("analyze_code_context")
     
-    # Gather context from surrounding files if provided
-    context_snippets = []
-    if surrounding_files:
-        context_snippets.append("## Related Files Context")
-        for file in surrounding_files[:3]:  # Limit to 3 files to avoid token limits
-            try:
-                with open(file, 'r') as f:
-                    content = f.read()
-                    # Include just enough context (first 50 lines or so)
-                    content_preview = "\n".join(content.split("\n")[:50])
-                    context_snippets.append(f"### {file}\n```\n{content_preview}\n```")
-            except Exception as e:
-                context_snippets.append(f"### {file}\nError reading file: {str(e)}")
-    
-    context_text = "\n\n".join(context_snippets)
-    prompt = template.format(
-        code=code.strip(),
-        file_path=file_path,
-        context=context_text
-    )
-    
-    return await _query_codex(ctx, prompt, model=model)
+    try:
+        # Gather context from surrounding files if provided
+        context_snippets = []
+        if surrounding_files:
+            context_snippets.append("## Related Files Context")
+            for file in surrounding_files[:3]:  # Limit to 3 files to avoid token limits
+                try:
+                    with open(file, 'r') as f:
+                        content = f.read()
+                        # Include just enough context (first 50 lines or so)
+                        content_preview = "\n".join(content.split("\n")[:50])
+                        context_snippets.append(f"### {file}\n```\n{content_preview}\n```")
+                except Exception as e:
+                    context_snippets.append(f"### {file}\nError reading file: {str(e)}")
+        
+        context_text = "\n\n".join(context_snippets)
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get(
+            "analyze_code_context",
+            code=code.strip(),
+            file_path=file_path,
+            context=context_text
+        )
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to analyze code context: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code context analysis failed: {str(e)}")
 
 
 @mcp.tool()
-async def interactive_code_generation(ctx: Context, description: str, language: str = "Python", feedback: str = "", iteration: int = 1, model: str = DEFAULT_MODEL) -> str:
+async def interactive_code_generation(ctx: Context, description: str, language: str = "Python", feedback: str = "", iteration: int = 1, model: str = None) -> str:
     """Generate code with an iterative feedback loop.
     
     Args:
@@ -350,32 +544,36 @@ async def interactive_code_generation(ctx: Context, description: str, language: 
     Returns:
         Generated code with explanation of changes based on feedback.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: interactive_code_generation - language=%s, iteration=%d, model=%s", 
                 language, iteration, model)
     
-    template = _load_prompt("interactive_code_generation")
-    
-    # Adjust prompt based on whether this is the first iteration or a refinement
-    if iteration > 1 and feedback:
-        prompt = template.format(
+    try:
+        # Adjust prompt based on whether this is the first iteration or a refinement
+        feedback_section = ""
+        if iteration > 1 and feedback:
+            feedback_section = f"\n\n## Previous Feedback\n{feedback.strip()}"
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get(
+            "interactive_code_generation",
             description=description.strip(),
             language=language,
-            feedback_section=f"\n\n## Previous Feedback\n{feedback.strip()}",
-            iteration=iteration
+            feedback_section=feedback_section,
+            iteration=iteration or 1
         )
-    else:
-        prompt = template.format(
-            description=description.strip(),
-            language=language,
-            feedback_section="",
-            iteration=1
-        )
-    
-    return await _query_codex(ctx, prompt, model=model)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to generate code interactively: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Interactive code generation failed: {str(e)}")
 
 
 @mcp.tool()
-async def generate_from_template(ctx: Context, template_name: str, parameters: Dict[str, str], language: str = "Python", model: str = DEFAULT_MODEL) -> str:
+async def generate_from_template(ctx: Context, template_name: str, parameters: Dict[str, str], language: str = "Python", model: str = None) -> str:
     """Generate code using customizable templates.
     
     Args:
@@ -388,38 +586,46 @@ async def generate_from_template(ctx: Context, template_name: str, parameters: D
     Returns:
         Generated code based on the template and parameters.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: generate_from_template - template=%s, language=%s, model=%s", 
                 template_name, language, model)
     
-    # Load the template - this could be from a templates directory
     try:
-        template_content = _load_template(template_name)
+        # Load the template - this could be from a templates directory
+        try:
+            template_content = _load_template(template_name)
+        except Exception as e:
+            logger.warning("Failed to load template '%s': %s. Using generic template.", template_name, e)
+            template_content = _load_prompt("generic_template")
+        
+        # Format the template with parameters
+        formatted_template = template_content
+        
+        # Format parameters for the prompt if using generic template
+        parameters_formatted = "\n".join([f"- {key}: {value}" for key, value in parameters.items()])
+        
+        for key, value in parameters.items():
+            placeholder = f"{{{key}}}"
+            formatted_template = formatted_template.replace(placeholder, value)
+        
+        # Add language information
+        prompt = f"# Template: {template_name}\n# Language: {language}\n\n{formatted_template}"
+        
+        # If using generic template, add parameters section
+        if template_content == _load_prompt("generic_template"):
+            prompt = prompt.replace("{parameters_formatted}", parameters_formatted)
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
     except Exception as e:
-        logger.warning("Failed to load template '%s': %s. Using generic template.", template_name, e)
-        template_content = _load_prompt("generic_template")
-    
-    # Format the template with parameters
-    formatted_template = template_content
-    
-    # Format parameters for the prompt if using generic template
-    parameters_formatted = "\n".join([f"- {key}: {value}" for key, value in parameters.items()])
-    
-    for key, value in parameters.items():
-        placeholder = f"{{{key}}}"
-        formatted_template = formatted_template.replace(placeholder, value)
-    
-    # Add language information
-    prompt = f"# Template: {template_name}\n# Language: {language}\n\n{formatted_template}"
-    
-    # If using generic template, add parameters section
-    if template_content == _load_prompt("generic_template"):
-        prompt = prompt.replace("{parameters_formatted}", parameters_formatted)
-    
-    return await _query_codex(ctx, prompt, model=model)
+        logger.error(f"Failed to generate from template: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Template code generation failed: {str(e)}")
 
 
 @mcp.tool()
-async def search_codebase(ctx: Context, query: str, file_patterns: List[str] = ["*.py", "*.js", "*.ts"], max_results: int = 5, model: str = DEFAULT_MODEL) -> str:
+async def search_codebase(ctx: Context, query: str, file_patterns: List[str] = ["*.py", "*.js", "*.ts"], max_results: int = 5, model: str = None) -> str:
     """Search and analyze code across multiple files based on natural language query.
     
     Args:
@@ -432,84 +638,93 @@ async def search_codebase(ctx: Context, query: str, file_patterns: List[str] = [
     Returns:
         Search results with relevant code snippets and explanations.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: search_codebase - query=%s, model=%s", query, model)
     
-    # This would be implemented to use shell commands to search the codebase
-    search_results = []
-    
-    # For each file pattern, run grep to find matches
-    for pattern in file_patterns:
-        try:
-            # Create a temporary file for the grep command
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-                f.write(f"find . -type f -name '{pattern}' -not -path '*/\\.*' | xargs grep -l '{query}' 2>/dev/null || true")
-                grep_script = f.name
-            
-            # Make the script executable
-            os.chmod(grep_script, 0o755)
-            
-            # Execute the grep command
-            import subprocess
-            result = subprocess.run([grep_script], capture_output=True, text=True, shell=True)
-            files_found = result.stdout.strip().split('\n')
-            
-            # Clean up
-            os.unlink(grep_script)
-            
-            # Process the results
-            for file in [f for f in files_found if f]:
-                try:
-                    with open(file, 'r') as f:
-                        content = f.read()
-                        # Find relevant snippets based on query
-                        lines = content.split('\n')
-                        total_lines = len(lines)
-                        
-                        # Look for lines containing the query
-                        matching_lines = []
-                        for i, line in enumerate(lines):
-                            if query.lower() in line.lower():
-                                # Get context (5 lines before and after)
-                                start = max(0, i - 5)
-                                end = min(total_lines, i + 6)
-                                matching_lines.append((start, end))
-                        
-                        # Merge overlapping ranges
-                        if matching_lines:
-                            merged_ranges = []
-                            current_start, current_end = matching_lines[0]
+    try:
+        # This would be implemented to use shell commands to search the codebase
+        search_results = []
+        
+        # For each file pattern, run grep to find matches
+        for pattern in file_patterns:
+            try:
+                # Create a temporary file for the grep command
+                with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                    f.write(f"find . -type f -name '{pattern}' -not -path '*/\\.*' | xargs grep -l '{query}' 2>/dev/null || true")
+                    grep_script = f.name
+                
+                # Make the script executable
+                os.chmod(grep_script, 0o755)
+                
+                # Execute the grep command
+                import subprocess
+                result = subprocess.run([grep_script], capture_output=True, text=True, shell=True)
+                files_found = result.stdout.strip().split('\n')
+                
+                # Clean up
+                os.unlink(grep_script)
+                
+                # Process the results
+                for file in [f for f in files_found if f]:
+                    try:
+                        with open(file, 'r') as f:
+                            content = f.read()
+                            # Find relevant snippets based on query
+                            lines = content.split('\n')
+                            total_lines = len(lines)
                             
-                            for start, end in matching_lines[1:]:
-                                if start <= current_end:
-                                    current_end = max(current_end, end)
-                                else:
-                                    merged_ranges.append((current_start, current_end))
-                                    current_start, current_end = start, end
+                            # Look for lines containing the query
+                            matching_lines = []
+                            for i, line in enumerate(lines):
+                                if query.lower() in line.lower():
+                                    # Get context (5 lines before and after)
+                                    start = max(0, i - 5)
+                                    end = min(total_lines, i + 6)
+                                    matching_lines.append((start, end))
                             
-                            merged_ranges.append((current_start, current_end))
-                            
-                            # Extract snippets from merged ranges
-                            snippets = []
-                            for start, end in merged_ranges[:3]:  # Limit to 3 snippets per file
-                                snippet = "\n".join(lines[start:end])
-                                snippets.append(f"Lines {start+1}-{end}:\n```\n{snippet}\n```")
-                            
-                            search_results.append(f"## {file}\n{' '.join(snippets)}")
-                except Exception as e:
-                    search_results.append(f"Error reading {file}: {str(e)}")
-        except Exception as e:
-            search_results.append(f"Error searching {pattern}: {str(e)}")
-    
-    if not search_results:
-        search_results = ["No matching files found."]
-    
-    template = _load_prompt("search_codebase")
-    prompt = template.format(
-        query=query,
-        search_results="\n\n".join(search_results[:max_results])
-    )
-    
-    return await _query_codex(ctx, prompt, model=model)
+                            # Merge overlapping ranges
+                            if matching_lines:
+                                merged_ranges = []
+                                current_start, current_end = matching_lines[0]
+                                
+                                for start, end in matching_lines[1:]:
+                                    if start <= current_end:
+                                        current_end = max(current_end, end)
+                                    else:
+                                        merged_ranges.append((current_start, current_end))
+                                        current_start, current_end = start, end
+                                
+                                merged_ranges.append((current_start, current_end))
+                                
+                                # Extract snippets from merged ranges
+                                snippets = []
+                                for start, end in merged_ranges[:3]:  # Limit to 3 snippets per file
+                                    snippet = "\n".join(lines[start:end])
+                                    snippets.append(f"Lines {start+1}-{end}:\n```\n{snippet}\n```")
+                                
+                                search_results.append(f"## {file}\n{' '.join(snippets)}")
+                    except Exception as e:
+                        search_results.append(f"Error reading {file}: {str(e)}")
+            except Exception as e:
+                search_results.append(f"Error searching {pattern}: {str(e)}")
+        
+        if not search_results:
+            search_results = ["No matching files found."]
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get(
+            "search_codebase",
+            query=query,
+            search_results="\n\n".join(search_results[:max_results])
+        )
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to search codebase: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Codebase search failed: {str(e)}")
 
 
 @mcp.tool()
@@ -519,7 +734,7 @@ async def generate_api_docs(
     framework: str = "FastAPI",
     output_format: Literal["openapi", "swagger", "markdown", "code"] = "openapi",
     client_language: str = "Python",
-    model: str = DEFAULT_MODEL
+    model: str = None
 ) -> str:
     """Generate API documentation or client code from API implementation code.
     
@@ -534,16 +749,30 @@ async def generate_api_docs(
     Returns:
         Generated API documentation or client code based on the specified format.
     """
+    model = model or config.default_model
     logger.info("TOOL REQUEST: generate_api_docs - framework=%s, output_format=%s, model=%s", 
                 framework, output_format, model)
     
-    template = _load_prompt("generate_api_docs")
-    
-    prompt = template.format(
-        code=code.strip(),
-        framework=framework,
-        output_format=output_format,
-        client_language=client_language
-    )
-    
-    return await _query_codex(ctx, prompt, model=model)
+    try:
+        # Validate output_format
+        valid_formats = ["openapi", "swagger", "markdown", "code"]
+        if output_format not in valid_formats:
+            output_format = "openapi"  # Default if invalid
+            logger.warning(f"Invalid output_format '{output_format}', defaulting to 'openapi'")
+        
+        # Get formatted prompt using prompt manager
+        prompt = prompts.get(
+            "generate_api_docs",
+            code=code.strip(),
+            framework=framework,
+            output_format=output_format,
+            client_language=client_language
+        )
+        
+        # Pass to enhanced query function
+        return await _query_codex(ctx, prompt, model=model)
+    except Exception as e:
+        logger.error(f"Failed to generate API docs: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"API documentation generation failed: {str(e)}")

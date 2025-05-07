@@ -53,24 +53,32 @@ logger.info("Shared MCP instance initialized.")
 
 pipe: CodexPipe | None = None
 
-# Find codex executable on PATH
+# -----------------------------------------------------------
+# Codex CLI detection
+# -----------------------------------------------------------
+
+# Locate `codex` executable.  If it is unavailable we fall back to
+# runtime-level fallbacks implemented in *tools.py* (e.g. OpenAI SDK).
+
 codex_executable_path = shutil.which("codex")
 
 if not codex_executable_path:
-    logger.error(
-        "Error: 'codex' executable not found on system PATH. "
-        "Install via 'npm i -g @openai/codex' and ensure its directory is in your $PATH."
+    logger.warning(
+        "'codex' executable not found – Codex CLI features disabled. "
+        "The library will attempt to fall back to the OpenAI Chat API."
     )
-    CODEX_CMD = None # Set to None if not found
+    CODEX_CMD = None  # CodexPipe will not be initialised
 else:
-    logger.info(f"Found 'codex' executable at: {codex_executable_path}")
+    logger.info("Found 'codex' executable at: %s", codex_executable_path)
     CODEX_CMD = [
-        codex_executable_path, # Use the found path
+        codex_executable_path,
         "--json",
         "--pipe",
-        "-q", "Hello",  # initial dummy prompt to satisfy quiet mode
+        "-q",
+        "Hello",  # initial dummy prompt to satisfy quiet mode
         "--approval-mode=full-auto",
         "--disable-shell",
+        "--exit-when-idle",
     ]
 
 # Set environment variable before creating the pipe

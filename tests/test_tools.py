@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import os
+
 from fastmcp import Context
 
 from codexmcp.tools import (
@@ -52,8 +54,11 @@ class TestQueryCodex:
         """Test _query_codex with no pipe initialized."""
         mock_ctx = MagicMock(spec=Context)
 
-        with pytest.raises(Exception):
-            await _query_codex(mock_ctx, "test prompt", model="o4-mini")
+        # Ensure OpenAI fallback is disabled to force error path
+        with patch("codexmcp.tools._OPENAI_SDK_AVAILABLE", False):
+            with patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+                with pytest.raises(Exception):
+                    await _query_codex(mock_ctx, "test prompt", model="o4-mini")
 
     @pytest.mark.asyncio
     @patch("codexmcp.tools.pipe")

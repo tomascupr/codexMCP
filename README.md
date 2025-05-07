@@ -63,6 +63,20 @@ The `generate_from_template` tool enables code generation using customizable tem
 
    ```bash
    pip install codexmcp[test]
+
+4. **(Optional) Python-only fallback**
+
+   If you *don’t* want to install the Node-based Codex CLI you can instead
+   install the OpenAI Python SDK extra:
+
+   ```bash
+   # installs codexmcp + openai
+   pip install "codexmcp[openai]"
+   ```
+
+   Make sure `OPENAI_API_KEY` is set in your environment or `.env` file.  At
+   runtime CodexMCP will automatically fall back to the OpenAI ChatCompletion
+   API whenever the `codex` executable cannot be found.
    ```
 
 3. **Environment Setup**:
