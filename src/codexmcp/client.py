@@ -24,6 +24,7 @@ class LLMClient:
     
     _instances: ClassVar[Dict[str, "LLMClient"]] = {}
     _response_cache: Dict[str, tuple] = {}  # {prompt_hash: (response, timestamp)}
+    _cache_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _cache_ttl = 3600  # 1 hour cache TTL
     
     def __new__(cls, provider: str = "openai"):
@@ -54,12 +55,13 @@ class LLMClient:
         """Generate LLM response with caching and retries."""
         prompt_hash = self._hash_prompt(prompt, **params)
         
-        # Check cache
-        if prompt_hash in self._response_cache:
-            response, timestamp = self._response_cache[prompt_hash]
-            if time.time() - timestamp < self._cache_ttl:
-                logger.info("Cache hit for prompt %s", prompt_hash[:8])
-                return response
+        # Check cache under lock for thread-safety in multi-task scenarios
+        async with self._cache_lock:
+            if prompt_hash in self._response_cache:
+                response, timestamp = self._response_cache[prompt_hash]
+                if time.time() - timestamp < self._cache_ttl:
+                    logger.info("Cache hit for prompt %s", prompt_hash[:8])
+                    return response
             
         # Generate with retries
         retries, max_retries = 0, 3
@@ -70,8 +72,9 @@ class LLMClient:
                 else:
                     raise ValueError(f"Provider {self.provider} not configured")
                 
-                # Cache successful response
-                self._response_cache[prompt_hash] = (response, time.time())
+                # Cache successful response (thread-safe)
+                async with self._cache_lock:
+                    self._response_cache[prompt_hash] = (response, time.time())
                 logger.info("Generated and cached response for %s", prompt_hash[:8])
                 return response
                 
@@ -105,8 +108,9 @@ class LLMClient:
                 stream=False,  # Maintain non-streaming for compatibility
             )
             
-            # Extract and normalize response text
-            return chat_resp.choices[0].message.content.lstrip("\n")
+            # Extract and normalize response text (guard against None)
+            content: Optional[str] = getattr(chat_resp.choices[0].message, "content", None)  # type: ignore[attr-defined]
+            return (content or "").lstrip("\n")
             
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
