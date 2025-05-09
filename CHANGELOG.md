@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2025-05-09
+
+### Added
+- Lazy loading of prompt templates to improve startup performance
+- Special handling for `o4-mini` model with optimized parameters
+- Developer notes section in README.md
+
+### Changed
+- Moved prompt templates from `src/codexmcp/prompts/` to `src/codexmcp/prompt_files/`
+- Simplified JSON processing in `_query_codex_via_pipe` function
+- Improved `LLMClient` to better handle different OpenAI models
+- Modified package imports to avoid premature loading
+
 ## [0.1.4] - 2025-04-23
 
 ### Added

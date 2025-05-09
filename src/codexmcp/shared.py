@@ -113,4 +113,4 @@ else:
     logger.info("CodexPipe not initialized. Using LLM client exclusively.")
     pipe = None
 
-__version__ = "0.2.0"
+__version__ = "0.1.5"
