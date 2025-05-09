@@ -1,11 +1,6 @@
 """Unit tests for codexmcp tools module."""
 
 import pytest
-
-# Temporarily skip this test module after major refactor; will be revisited.
-pytest.skip("Skipping tools tests pending refactor updates", allow_module_level=True)
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import os
@@ -31,54 +26,34 @@ from codexmcp.tools import (
 
 
 class TestQueryCodex:
-    """Tests for the internal _query_codex function."""
+    """Tests for the internal _query_codex function using the new CLI and API paths."""
 
     @pytest.mark.asyncio
-    @patch("codexmcp.tools.pipe")
-    async def test_query_codex_success(self, mock_pipe):
-        """Test successful query to codex."""
-        # Setup mock
-        mock_pipe.send = AsyncMock()
-        mock_pipe.recv = AsyncMock(return_value='{"completion": "test response"}')
-
-        # Create mock context
+    @patch("codexmcp.tools._query_codex_via_pipe", new_callable=AsyncMock)
+    async def test_query_codex_success_cli(self, mock_via_pipe):
+        """Test that _query_codex uses the CLI path when available."""
+        mock_via_pipe.return_value = "cli response"
         mock_ctx = MagicMock(spec=Context)
         mock_ctx.progress = AsyncMock()
 
-        # Call the function
         result = await _query_codex(mock_ctx, "test prompt", model="o4-mini")
 
-        # Assertions
-        mock_pipe.send.assert_called_once_with({"prompt": "test prompt", "model": "o4-mini"})
-        mock_pipe.recv.assert_called_once()
-        assert result == "test response"
+        mock_via_pipe.assert_awaited_once_with(mock_ctx, "test prompt", model="o4-mini")
+        assert result == "cli response"
 
     @pytest.mark.asyncio
     @patch("codexmcp.tools.pipe", None)
-    async def test_query_codex_no_pipe(self):
-        """Test _query_codex with no pipe initialized."""
+    @patch("codexmcp.tools.LLMClient.generate", new_callable=AsyncMock)
+    async def test_query_codex_api_fallback(self, mock_generate):
+        """Test that _query_codex falls back to the API when CLI is disabled."""
+        mock_generate.return_value = "api response"
         mock_ctx = MagicMock(spec=Context)
+        mock_ctx.progress = AsyncMock()
 
-        # Ensure OpenAI fallback is disabled to force error path
-        with patch("codexmcp.tools._OPENAI_SDK_AVAILABLE", False):
-            with patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
-                with pytest.raises(Exception):
-                    await _query_codex(mock_ctx, "test prompt", model="o4-mini")
+        result = await _query_codex(mock_ctx, "test prompt", model="gpt-4")
 
-    @pytest.mark.asyncio
-    @patch("codexmcp.tools.pipe")
-    async def test_query_codex_json_error(self, mock_pipe):
-        """Test _query_codex with invalid JSON response."""
-        # Setup mock
-        mock_pipe.send = AsyncMock()
-        mock_pipe.recv = AsyncMock(return_value='invalid json')
-
-        # Create mock context
-        mock_ctx = MagicMock(spec=Context)
-
-        # Call the function and expect exception
-        with pytest.raises(Exception):
-            await _query_codex(mock_ctx, "test prompt", model="o4-mini")
+        mock_generate.assert_awaited_once()
+        assert result == "api response"
 
 
 class TestGenerateCode:
