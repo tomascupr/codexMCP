@@ -1,0 +1,20 @@
+# Task: Documentation Generation
+You are a technical writer creating professional documentation for code.
+
+## Code to Document
+{code}
+
+## Documentation Format: {doc_format}
+- docstring: Generate language-appropriate docstrings embedded in the code
+- markdown: Create standalone markdown documentation with sections for classes, functions, usage examples
+- html: Produce HTML documentation with proper structure, highlighting, and navigation
+
+## Documentation Requirements
+- Clearly describe all functions, classes, and methods
+- Document parameters, return types, and exceptions
+- Include usage examples for key components
+- Specify any important dependencies or requirements
+- Follow best practices for the specified documentation format
+
+## Output Format
+Provide only the documentation without any additional explanations. 

@@ -96,17 +96,38 @@ class LLMClient:
             
         # Convert CodexMCP parameters to OpenAI parameters
         model = params.get("model", "gpt-4o")
-        temp = params.get("temperature", 0.2)
-        max_tokens = params.get("max_tokens", 4096)
         
+        # Model-specific parameter adjustments
+        if model == "o4-mini":
+            temp = 1.0  # o4-mini requires temperature to be 1.0
+            max_completion_tokens_val = params.get("max_tokens", 4096) # Keep existing logic for max_tokens
+        else:
+            temp = params.get("temperature", 0.2)
+            max_completion_tokens_val = params.get("max_tokens", 4096) # Keep existing logic for max_tokens
+
+        api_params = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temp,
+            "stream": False, # Maintain non-streaming for compatibility
+        }
+
+        # Adapt max_tokens to max_completion_tokens (already handled for o4-mini case indirectly)
+        # This logic can be refined if more models have different needs for max_tokens vs max_completion_tokens
+        if "max_tokens" in params: # Use provided max_tokens if available
+            api_params["max_completion_tokens"] = params["max_tokens"]
+        elif model == "o4-mini": # Ensure o4-mini gets its specific default/value if not in params
+             api_params["max_completion_tokens"] = max_completion_tokens_val # Already set above
+        else: # General default
+            api_params["max_completion_tokens"] = 4096
+
+
+        # Remove original max_tokens from params if it was used to avoid conflicts,
+        # or if other params need more complex mapping later.
+        # For now, we are constructing api_params directly.
+
         try:
-            chat_resp = await self.client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temp,
-                max_tokens=max_tokens,
-                stream=False,  # Maintain non-streaming for compatibility
-            )
+            chat_resp = await self.client.chat.completions.create(**api_params)
             
             # Extract and normalize response text (guard against None)
             content: Optional[str] = getattr(chat_resp.choices[0].message, "content", None)  # type: ignore[attr-defined]

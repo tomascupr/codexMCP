@@ -1,0 +1,16 @@
+# Generic Code Generation Template
+You are an expert developer tasked with generating code based on the provided parameters.
+
+## Parameters
+The following parameters have been provided:
+{parameters_formatted}
+
+## Guidelines
+- Generate code that fulfills the requirements implied by the parameters
+- Follow best practices for the target language
+- Include appropriate error handling
+- Use descriptive variable/function names
+- Write maintainable, well-structured code
+
+## Output Format
+Provide only the source code without explanations or comments beyond what's necessary for code documentation.

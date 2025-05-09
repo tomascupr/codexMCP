@@ -1,0 +1,17 @@
+# Task: Code Explanation
+You are a technical educator tasked with explaining code to {detail_level} level of detail.
+
+## Code to Explain
+{code}
+
+## Explanation Guidelines for '{detail_level}' Detail Level
+- Brief: Provide a concise 2-3 sentence high-level overview of what the code does
+- Medium: Explain main functions/classes and their purposes, key algorithms, and overall structure
+- Detailed: Provide comprehensive breakdown of all components, logic flows, design patterns, and potential edge cases
+
+## Focus Areas
+- Overall purpose and functionality
+- Key algorithms and data structures
+- Control flow and execution path
+- Important design patterns or techniques used
+- Potential performance considerations or limitations 
