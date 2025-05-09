@@ -60,57 +60,7 @@ logger.info("Initialized LLM client")
 
 pipe: CodexPipe | None = None
 
-# -----------------------------------------------------------
-# Codex CLI detection
-# -----------------------------------------------------------
-
-# Locate `codex` executable.  If it is unavailable we fall back to
-# using the LLMClient directly.
-
-codex_executable_path = shutil.which("codex")
-
-if not codex_executable_path:
-    logger.warning(
-        "'codex' executable not found – Codex CLI features disabled. "
-        "The library will use the LLM Client API interface instead."
-    )
-    CODEX_CMD = None  # CodexPipe will not be initialised
-else:
-    logger.info(f"Found 'codex' executable at: {codex_executable_path}")
-    CODEX_CMD = [
-        codex_executable_path,
-        "--json",
-        "--pipe",
-        "-q",
-        "Hello",  # initial dummy prompt to satisfy quiet mode
-        "--approval-mode=full-auto",
-        "--disable-shell",
-        "--exit-when-idle",
-    ]
-
-# Set environment variable before creating the pipe
-os.environ["CODEX_ALLOW_DIRTY"] = "1"
-
-# Initialize CodexPipe only if the command was found and CLI usage is enabled
-if CODEX_CMD and os.environ.get("CODEXMCP_USE_CLI", "1").lower() in ("1", "true", "yes"):
-    try:
-        logger.info("Initializing shared CodexPipe instance...")
-        pipe = CodexPipe(CODEX_CMD)
-        logger.info("Shared CodexPipe instance initialized.")
-        # Discard the first response
-        logger.info("Attempting to discard dummy prompt response...")
-        try:
-            # Consider making this non-blocking if it causes startup delays
-            _ = pipe.process.stdout.readline()
-            logger.info("Dummy prompt response discarded.")
-        except Exception as e_read:
-            logger.warning(f"Could not read/discard dummy prompt response: {e_read}")
-    except Exception as e_pipe:  # Catch generic exceptions during pipe init
-        logger.error(f"Failed to initialize CodexPipe with command '{' '.join(CODEX_CMD)}': {e_pipe}", exc_info=True)
-        pipe = None  # Ensure pipe is None if initialization fails
-else:
-    # Logged the error earlier when codex_executable_path was None
-    logger.info("CodexPipe not initialized. Using LLM client exclusively.")
-    pipe = None
+# CodexPipe support removed – CLI is executed per-call in `cli_backend`.
+# Retain `pipe = None` for backward compatibility.
 
 __version__ = "0.1.5"

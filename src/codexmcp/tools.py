@@ -7,7 +7,6 @@ import os
 import tempfile
 import importlib.resources  # Use importlib.resources
 from typing import Any, Dict, List, Literal, Optional
-import uuid
 import asyncio # Add asyncio for subprocess
 import shutil # Add shutil for which function
 
@@ -26,7 +25,6 @@ except ImportError:  # pragma: no cover – only executed when dependency missin
 from fastmcp import Context, exceptions
 
 # Local imports
-from .client import LLMClient
 from .config import config
 from .exceptions import (
     CodexBaseError,
@@ -36,8 +34,9 @@ from .exceptions import (
     CodexConnectionError,
 )
 from .logging_cfg import logger
-from .shared import mcp, pipe  # Import from shared
+from .shared import mcp  # Import MCP only; CodexPipe is no longer used
 from .prompts import prompts
+from .cli_backend import run as _cli_run
 
 
 # Helper to load templates
@@ -71,86 +70,23 @@ def _load_prompt(name: str) -> str:
 
 
 async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str:
-    """Enhanced LLM helper with reliability improvements.
-    
-    Preference order:
-        1. Codex CLI via the long-lived ``pipe`` singleton (if available)
-        2. OpenAI API via LLMClient (with caching and retries)
-    
-    Args:
-        ctx: FastMCP context object
-        prompt: The formatted prompt to send to the model
-        model: The model identifier to use
-        
-    Returns:
-        Processed text response from the model
-        
-    Raises:
-        CodexBaseError: When generation fails for any reason
+    """Send *prompt* to Codex CLI and return the completion.
+
+    All FastMCP tools now delegate to Codex CLI exclusively so we keep this
+    helper very thin: forward the call and adapt progress/error reporting.
     """
-    # Generate a unique error ID for traceability
-    error_id = uuid.uuid4().hex[:8]
-    
-    # Report progress to client
+
+    # Optional user-visible progress
     if hasattr(ctx, "progress"):
-        await ctx.progress("Generating response...")
-    
+        await ctx.progress("Generating with Codex CLI…")
+
     try:
-        # ------------------------------------------------------------------
-        # 1. Codex CLI path - if available
-        # ------------------------------------------------------------------
-        if pipe is not None:
-            try:
-                return await _query_codex_via_pipe(ctx, prompt, model=model)
-            except Exception as e:
-                logger.warning(
-                    f"Codex CLI path failed (error_id={error_id}): {str(e)}. Falling back to API."
-                )
-                # Continue to API fallback
-        
-        # ------------------------------------------------------------------
-        # 2. LLM Client path with retries and caching
-        # ------------------------------------------------------------------
-        # Initialize the client (singleton pattern ensures only one instance)
-        client = LLMClient()
-        
-        # Configure params based on our config
-        params = {
-            "model": model,
-            "temperature": config.default_temperature,
-            "max_tokens": config.default_max_tokens,
-        }
-        
-        # Generate with advanced client
-        response = await client.generate(prompt, **params)
-        return response.strip()
-            
-    except Exception as e:
-        # Enhanced error capturing with classification
-        logger.error(f"Generation error {error_id}: {str(e)}", exc_info=True)
-        
-        # Classify the error
-        if "rate limit" in str(e).lower():
-            raise CodexRateLimitError(
-                "Rate limit exceeded. Please try again later.", error_id
-            )
-        elif "timeout" in str(e).lower():
-            raise CodexTimeoutError(
-                "Request timed out. Please try again.", error_id
-            )
-        elif "model" in str(e).lower() and ("not found" in str(e).lower() or "unavailable" in str(e).lower()):
-            raise CodexModelUnavailableError(
-                f"Model '{model}' is unavailable. Try a different model.", error_id
-            ) 
-        elif "connect" in str(e).lower():
-            raise CodexConnectionError(
-                "Failed to connect to the provider. Check your internet connection.", error_id
-            )
-        else:
-            # Generic error with traceable ID
-            raise CodexBaseError(
-                f"Failed to generate response: {str(e)}", error_id
-            )
+        logger.info("Running Codex CLI with prompt: %s", prompt.replace('\n',' ')[:120])
+        return await _cli_run(prompt, model)
+    except Exception as exc:
+        logger.error("Codex CLI failed: %s", exc, exc_info=True)
+        # Preserve previous exception type hierarchy for callers
+        raise CodexBaseError(str(exc), "cli_error") from exc
 
 
 async def _query_codex_via_pipe(ctx: Context, prompt: str, *, model: str) -> str:
@@ -177,7 +113,7 @@ async def _query_codex_via_pipe(ctx: Context, prompt: str, *, model: str) -> str
 
     # Construct the command: codex_exe <pre_args> -q <prompt> <post_args>
     cmd = [codex_exe] + pre_prompt_args + ["-q", f'"{prompt}"'] + post_prompt_args
-    logger.info(f"Executing Codex CLI: {' '.join(cmd)}")
+    logger.info("CLI cmd: %s", ' '.join(cmd))
 
     process = await asyncio.create_subprocess_exec(
         *cmd,
@@ -246,97 +182,129 @@ async def _query_codex_via_pipe(ctx: Context, prompt: str, *, model: str) -> str
 
 
 @mcp.tool()
-async def generate_code(ctx: Context, description: str, language: str = "Python", model: str = None) -> str:
-    """Generate *language* source code that fulfils *description*."""
+async def generate_code(ctx: Context, description: str, language: str = "Python", model: str | None = None) -> str:
+    """Generate source code as described. Uses Codex CLI with full FS context."""
     model = model or config.default_model
-    logger.info("TOOL REQUEST: generate_code - language=%s, model=%s", language, model)
-    
-    try:
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get("generate_code", language=language, description=description)
-        
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model)
-    except Exception as e:
-        logger.error(f"Failed to generate code: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Code generation failed: {str(e)}")
+    prompt = f"Generate {language} code that fulfils the following description:\n{description.strip()}"
+    return await _query_codex(ctx, prompt, model=model)
 
 
 @mcp.tool()
-async def assess_code_quality(ctx: Context, code: str, language: str = "Python", focus_areas: List[str] = [], model: str = None) -> str:
-    """Assess code quality and provide improvement suggestions.
-    
-    Args:
-        ctx: The FastMCP context.
-        code: The code to assess.
-        language: Programming language.
-        focus_areas: Specific areas to focus on (e.g., "performance", "readability", "security").
-        model: The OpenAI model to use.
-    
-    Returns:
-        Code quality assessment with actionable improvement suggestions.
+async def assess_code_quality(
+    ctx: Context,
+    code: str | None = None,
+    language: str = "Python",
+    focus_areas: List[str] | None = None,
+    extra_prompt: str | None = None,
+    model: str | None = None,
+) -> str:
+    """Ask Codex to review code quality.
+
+    If *code* is omitted the CLI can read the workspace; *extra_prompt* lets the
+    caller provide free-form instructions (e.g. "especially security aspects").
     """
+
     model = model or config.default_model
-    logger.info("TOOL REQUEST: assess_code_quality - language=%s, model=%s", language, model)
-    
-    try:
-        # Format focus areas for the prompt
-        focus_areas_text = ""
-        if focus_areas:
-            focus_areas_text = "\n\n## Focus Areas\nPlease pay special attention to these aspects:\n"
-            focus_areas_text += "\n".join([f"- {area}" for area in focus_areas])
-        
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get("assess_code_quality", 
-                           code=code.strip(), 
-                           language=language, 
-                           focus_areas=focus_areas_text)
-        
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model)
-    except Exception as e:
-        logger.error(f"Failed to assess code quality: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Code quality assessment failed: {str(e)}")
+
+    if code:
+        if _is_probably_code(code):
+            prompt = "Assess the quality of the following code:\n\n" + code.strip()
+        else:
+            # treat provided text as high-level instruction
+            prompt = code.strip()
+            code = None  # no inline code snippet
+    else:
+        prompt = "Assess the overall codebase quality."
+
+    if focus_areas:
+        prompt += "\n\nFocus on: " + ", ".join(focus_areas)
+
+    if extra_prompt:
+        prompt += "\n\n" + extra_prompt.strip()
+
+    return await _query_codex(ctx, prompt, model=model)
 
 
 @mcp.tool()
-async def migrate_code(ctx: Context, code: str, from_version: str, to_version: str, language: str = "Python", model: str = None) -> str:
-    """Migrate code between different language versions or frameworks.
-    
-    Args:
-        ctx: The FastMCP context.
-        code: The code to migrate.
-        from_version: Source version/framework (e.g., "Python 2", "React 16").
-        to_version: Target version/framework (e.g., "Python 3", "React 18").
-        language: Base programming language.
-        model: The OpenAI model to use.
-    
-    Returns:
-        Migrated code with explanation of changes.
-    """
+async def migrate_code(
+    ctx: Context,
+    code: str | None = None,
+    from_version: str = "",
+    to_version: str = "",
+    language: str = "Python",
+    model: str | None = None,
+) -> str:
+    """Request Codex to migrate code or project between versions/frameworks."""
+
     model = model or config.default_model
-    logger.info("TOOL REQUEST: migrate_code - from=%s, to=%s, model=%s", 
-               from_version, to_version, model)
-    
-    try:
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get("migrate_code", 
-                           code=code.strip(),
-                           from_version=from_version,
-                           to_version=to_version,
-                           language=language)
-        
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model)
-    except Exception as e:
-        logger.error(f"Failed to migrate code: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Code migration failed: {str(e)}")
+
+    task_line = f"Migrate {language} code from {from_version or 'current version'} to {to_version or 'latest version'}."
+    if code:
+        prompt = task_line + "\n\nCode to migrate:\n" + code.strip()
+    else:
+        prompt = task_line + "\n\nApply changes across the repository as needed."
+
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def write_tests(ctx: Context, code: str | None = None, description: str = "", model: str | None = None) -> str:
+    """Ask Codex to write unit tests."""
+    model = model or config.default_model
+
+    if code:
+        prompt = "Write comprehensive unit tests for the following code:\n\n" + code.strip()
+        if description:
+            prompt += "\n\nAdditional context: " + description.strip()
+    else:
+        prompt = "Write comprehensive unit tests for the project." + (" " + description.strip() if description else "")
+
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def explain_code_for_audience(
+    ctx: Context,
+    code: str | None = None,
+    audience: str = "developer",
+    detail_level: str = "medium",
+    model: str | None = None,
+) -> str:
+    """Explain code for a given audience/detail."""
+
+    model = model or config.default_model
+    levels = {"brief", "medium", "detailed"}
+    if detail_level not in levels:
+        detail_level = "medium"
+
+    if code:
+        if _is_probably_code(code):
+            prompt = (
+                f"Explain the following code to a {audience} in {detail_level} detail:\n\n" + code.strip()
+            )
+        else:
+            prompt = f"{code.strip()}\n\n(Provide the explanation above to a {audience} in {detail_level} detail.)"
+    else:
+        prompt = f"Explain the project architecture to a {audience} in {detail_level} detail."
+
+    return await _query_codex(ctx, prompt, model=model)
+
+
+@mcp.tool()
+async def generate_docs(ctx: Context, code: str | None = None, doc_format: str = "docstring", model: str | None = None) -> str:
+    """Ask Codex to generate documentation."""
+
+    model = model or config.default_model
+    formats = {"docstring", "markdown", "html"}
+    if doc_format not in formats:
+        doc_format = "docstring"
+
+    if code:
+        prompt = f"Generate {doc_format} documentation for the following code:\n\n" + code.strip()
+    else:
+        prompt = f"Generate {doc_format} documentation for the project."
+
+    return await _query_codex(ctx, prompt, model=model)
 
 
 @mcp.tool()
@@ -396,117 +364,26 @@ async def refactor_code(ctx: Context, code: str, instruction: str, model: str = 
 
 
 @mcp.tool()
-async def write_tests(ctx: Context, code: str, description: str = "", model: str = None) -> str:
-    """Generate unit tests for *code*."""
-    model = model or config.default_model
-    logger.info("TOOL REQUEST: write_tests - model=%s", model)
-    
-    try:
-        # Format description section
-        desc_section = f"\n\n## Additional Context\n{description}" if description else ""
-        
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get("write_tests", 
-                           code=code.strip(), 
-                           description=desc_section)
-        
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model)
-    except Exception as e:
-        logger.error(f"Failed to write tests: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Test generation failed: {str(e)}")
+async def explain_code(ctx: Context, *args, audience: str = "developer", detail_level: str = "medium", model: str | None = None) -> str:
+    """High-level explanation of the current project or a specific snippet.
 
-
-@mcp.tool()
-async def explain_code_for_audience(ctx: Context, code: str, audience: str = "developer", detail_level: str = "medium", model: str = None) -> str:
-    """Explain code with customized detail level for different audiences.
-    
-    Args:
-        ctx: The FastMCP context.
-        code: The code to explain.
-        audience: Target audience (e.g., "developer", "manager", "beginner").
-        detail_level: Level of detail ("brief", "medium", "detailed").
-        model: The OpenAI model to use.
-    
-    Returns:
-        Code explanation tailored to the specified audience and detail level.
+    examples:
+        explain(ctx)                       # overview of repo
+        explain(ctx, "README.md")        # explain that file
+        explain(ctx, code_snippet)        # explain snippet
     """
+
+    subject: str | None = args[0] if args else None  # first positional arg if provided
     model = model or config.default_model
-    logger.info("TOOL REQUEST: explain_code_for_audience - audience=%s, detail_level=%s, model=%s", 
-               audience, detail_level, model)
-    
-    try:
-        # Validate detail level
-        if detail_level not in ["brief", "medium", "detailed"]:
-            detail_level = "medium"  # Default to medium if invalid
-            logger.warning(f"Invalid detail_level '{detail_level}', defaulting to 'medium'")
-        
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get("explain_code_for_audience", 
-                           code=code.strip(),
-                           audience=audience,
-                           detail_level=detail_level)
-        
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model)
-    except Exception as e:
-        logger.error(f"Failed to explain code: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Code explanation failed: {str(e)}")
 
+    # Prefer first positional arg; otherwise capture the raw user utterance.
+    if not subject:
+        subject = getattr(ctx, "original_input", "").strip()
 
-@mcp.tool()
-async def explain_code(ctx: Context, code: str, detail_level: str = "medium", model: str = None) -> str:
-    """[DEPRECATED] Explain the functionality and structure of the provided *code*.
-    
-    This tool is deprecated and will be removed in a future version.
-    Please use `explain_code_for_audience` instead.
-    
-    The *detail_level* can be 'brief', 'medium', or 'detailed'.
-    """
-    model = model or config.default_model
-    logger.warning("DEPRECATION WARNING: 'explain_code' is deprecated. Use 'explain_code_for_audience' instead.")
-    
-    # Call the new tool with appropriate defaults
-    return await explain_code_for_audience(
-        ctx, 
-        code=code, 
-        audience="developer",  # Default audience
-        detail_level=detail_level,
-        model=model
-    )
+    # If we still have nothing meaningful, fall back to a very short request.
+    prompt = subject or "Describe the current repository at a high level."
 
-
-@mcp.tool()
-async def generate_docs(ctx: Context, code: str, doc_format: str = "docstring", model: str = None) -> str:
-    """Generate documentation for the provided *code*.
-    
-    The *doc_format* can be 'docstring', 'markdown', or 'html'.
-    """
-    model = model or config.default_model
-    logger.info("TOOL REQUEST: generate_docs - doc_format=%s, model=%s", doc_format, model)
-    
-    try:
-        # Validate doc_format
-        if doc_format not in ["docstring", "markdown", "html"]:
-            doc_format = "docstring"  # Default if invalid
-            logger.warning(f"Invalid doc_format '{doc_format}', defaulting to 'docstring'")
-        
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get("generate_docs", 
-                           code=code.strip(),
-                           doc_format=doc_format)
-        
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model)
-    except Exception as e:
-        logger.error(f"Failed to generate docs: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Documentation generation failed: {str(e)}")
+    return await _query_codex(ctx, prompt, model=model)
 
 
 @mcp.tool()
@@ -846,3 +723,69 @@ async def generate_api_docs(
         if isinstance(e, CodexBaseError):
             raise  # Pass through our custom errors
         raise exceptions.ToolError(f"API documentation generation failed: {str(e)}")
+
+# Helper to build a very simple prompt from arbitrary keyword arguments
+def _simple_prompt(tool_name: str, **kwargs) -> str:
+    """Serialize *kwargs* into a minimal prompt for Codex CLI.
+
+    The idea is to avoid rigid templates – we just list each argument so the
+    model can infer intent.  Empty / None values are skipped.
+    """
+    lines = [tool_name.replace("_", " ").title() + ":"]
+    for key, value in kwargs.items():
+        if key == "ctx" or key == "model":
+            continue
+        if value in (None, "", [], {}):
+            continue
+        if isinstance(value, (list, dict)):
+            import json as _json
+            val_str = _json.dumps(value, indent=2)
+        else:
+            val_str = str(value)
+        lines.append(f"{key}:\n{val_str}")
+    return "\n\n".join(lines)
+
+def _is_probably_code(text: str) -> bool:
+    """Heuristic to guess whether *text* is source code or plain language."""
+    code_indicators = ["def ", "class ", "import ", "{", ";", "=>", "<html", "function "]
+    return any(tok in text for tok in code_indicators) or "\n" in text and len(text.split()) > 10
+
+# ---------------------------------------------------------------------------
+# Aliases / simplified public tool set
+# ---------------------------------------------------------------------------
+
+# 1. assess_code – umbrella for quality / migration / other assessments
+@mcp.tool()
+async def assess_code(ctx: Context, *args, **kwargs):  # type: ignore[valid-type]
+    """Alias to `assess_code_quality` for the contracted public API."""
+    return await assess_code_quality(ctx, *args, **kwargs)  # type: ignore[arg-type]
+
+
+# 2. explain – high-level explanation helper
+@mcp.tool()
+async def explain(
+    ctx: Context,
+    *args,
+    audience: str = "developer",
+    detail_level: str = "medium",
+    model: str | None = None,
+):
+    """High-level explanation of the current project or a specific snippet.
+
+    examples:
+        explain(ctx)                       # overview of repo
+        explain(ctx, "README.md")        # explain that file
+        explain(ctx, code_snippet)        # explain snippet
+    """
+
+    subject: str | None = args[0] if args else None  # first positional arg if provided
+    model = model or config.default_model
+
+    # Prefer first positional arg; otherwise capture the raw user utterance.
+    if not subject:
+        subject = getattr(ctx, "original_input", "").strip()
+
+    # If we still have nothing meaningful, fall back to a very short request.
+    prompt = subject or "Describe the current repository at a high level."
+
+    return await _query_codex(ctx, prompt, model=model)

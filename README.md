@@ -17,33 +17,47 @@ A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/open
 
 ## New Features
 
-CodexMCP has been enhanced with several high-leverage improvements:
+CodexMCP has been enhanced with several key improvements:
 
-### 1. Context-Aware Code Analysis
+### 1. Streamlined Codex CLI Integration
+
+The latest update removes the long-lived CodexPipe in favor of per-call CLI execution, improving reliability and simplifying the architecture. All tools now route through a new dedicated `cli_backend` module.
+
+### 2. Simplified Tool Structure
+
+The tools API has been reorganized for clarity and ease of use, with a focus on the most essential coding tasks:
+- `generate_code`: Create new code across languages
+- `assess_code`: Evaluate and improve existing code
+- `explain`: Provide context-aware explanations 
+- `search_codebase`: Find relevant code sections
+- `write_tests`: Generate comprehensive test suites
+- `write_openai_agent`: Create OpenAI agent implementations
+
+### 3. Context-Aware Code Analysis
 
 The new `analyze_code_context` tool allows you to analyze code with awareness of its surrounding context, including related files. This provides deeper insights into how code fits into the broader architecture.
 
-### 2. Interactive Code Generation with Feedback Loop
+### 4. Interactive Code Generation with Feedback Loop
 
 The `interactive_code_generation` tool enables an iterative approach to code generation, where you can provide feedback on previous iterations to refine the results.
 
-### 3. Advanced Code Quality Assessment
+### 5. Advanced Code Quality Assessment
 
 The `assess_code_quality` tool provides detailed code quality assessments with actionable suggestions for improvement, focusing on specific areas like performance, readability, or security.
 
-### 4. Intelligent Code Search
+### 6. Intelligent Code Search
 
 The `search_codebase` tool allows you to search and analyze code across multiple files using natural language queries, making it easier to navigate large codebases.
 
-### 5. Audience-Targeted Code Explanations
+### 7. Audience-Targeted Code Explanations
 
 The `explain_code_for_audience` tool provides code explanations tailored to different audiences (developers, managers, beginners) with customizable detail levels.
 
-### 6. Code Migration and Modernization
+### 8. Code Migration and Modernization
 
 The `migrate_code` tool helps you migrate code between different language versions or frameworks, with explanations of the changes made.
 
-### 7. Template-Based Code Generation
+### 9. Template-Based Code Generation
 
 The `generate_from_template` tool enables code generation using customizable templates, increasing productivity for common tasks.
 
@@ -130,15 +144,15 @@ If you're developing or extending CodexMCP, be aware of these implementation det
 
 2. **o4-mini Model Support**: The system has special handling for the `o4-mini` model, including proper configuration of `max_completion_tokens` and temperature settings (temperature is always set to 1.0 for o4-mini).
 
-3. **CLI Fallback**: The system tries to use the Codex CLI first for better performance, falling back to the OpenAI API when necessary.
+3. **CLI Integration**: As of version 0.1.5, CodexMCP now uses a dedicated `cli_backend` module for all Codex CLI interactions, executed per-call rather than through a long-lived pipe. This improves reliability and simplifies the architecture.
 
 4. **Custom Templates**: To add custom templates, place them in `src/codexmcp/templates/` with a `.txt` extension. Templates use Python's standard string formatting with named placeholders like `{parameter_name}`.
 
 ### How It Works
 
 1. **Your Application** makes a request to a specific CodexMCP endpoint (like `/tools/generate_code`)
-2. **CodexMCP Server** processes the request and sends it to the OpenAI model
-3. **OpenAI Model** generates the requested code or documentation
+2. **CodexMCP Server** processes the request and sends it to the Codex CLI
+3. **Codex CLI** generates the requested code or documentation with filesystem context awareness
 4. **CodexMCP Server** returns the result to your application
 
 This approach gives you the power of AI coding assistance while keeping your application in control of when and how to use it.
@@ -147,88 +161,51 @@ This approach gives you the power of AI coding assistance while keeping your app
 
 CodexMCP provides the following AI-powered tools:
 
-#### Core Code Generation Tools
+#### Core Tools
 
 1. **generate_code**: Generate code in any programming language
    - `description`: Task description
    - `language`: Programming language (default: "Python")
    - `model`: OpenAI model to use (default: "o4-mini")
 
-2. **interactive_code_generation**: Generate code with an iterative feedback loop
-   - `description`: Task description
+2. **assess_code**: Evaluate and improve existing code
+   - `code`: Optional source code to assess (if omitted, analyzes workspace)
    - `language`: Programming language (default: "Python")
-   - `feedback`: Feedback on previous iterations
-   - `iteration`: Current iteration number (default: 1)
+   - `focus_areas`: Optional list of areas to focus on
+   - `extra_prompt`: Optional free-form instructions
    - `model`: OpenAI model to use (default: "o4-mini")
 
-3. **generate_from_template**: Generate code using customizable templates
-   - `template_name`: Name of the template to use
-   - `parameters`: Dictionary of parameters to fill in the template
-   - `language`: Programming language (default: "Python")
+3. **explain**: Provide context-aware code explanations
+   - First argument: Optional code snippet or file path
+   - `audience`: Target audience (default: "developer")
+   - `detail_level`: Level of detail (default: "medium")
    - `model`: OpenAI model to use (default: "o4-mini")
 
-#### Code Analysis Tools
-
-4. **explain_code_for_audience**: Explain code with customized detail level for different audiences
-   - `code`: Source code to explain
-   - `audience`: Target audience (e.g., "developer", "manager", "beginner")
-   - `detail_level`: Level of detail ("brief", "medium", "detailed")
+4. **write_tests**: Generate unit tests
+   - `code`: Optional source code to test (if omitted, analyzes workspace)
+   - `description`: Additional testing requirements
    - `model`: OpenAI model to use (default: "o4-mini")
 
-5. **assess_code_quality**: Assess code quality and provide improvement suggestions
-   - `code`: Source code to assess
-   - `language`: Programming language (default: "Python")
-   - `focus_areas`: Specific areas to focus on (e.g., "performance", "readability", "security")
-   - `model`: OpenAI model to use (default: "o4-mini")
-
-6. **analyze_code_context**: Analyze code with awareness of its surrounding context
-   - `code`: Source code to analyze
-   - `file_path`: Path to the file containing the code (for context)
-   - `surrounding_files`: List of related file paths to consider for context
-   - `model`: OpenAI model to use (default: "o4-mini")
-
-7. **search_codebase**: Search and analyze code across multiple files based on natural language query
-   - `query`: Natural language search query
-   - `file_patterns`: File patterns to include in search (default: ["*.py", "*.js", "*.ts"])
-   - `max_results`: Maximum number of results to return (default: 5)
-   - `model`: OpenAI model to use (default: "o4-mini")
-
-#### Code Transformation Tools
-
-8. **migrate_code**: Migrate code between different language versions or frameworks
-   - `code`: Source code to migrate
+5. **migrate_code**: Migrate code between different versions or frameworks
+   - `code`: Optional source code to migrate (if omitted, analyzes workspace)
    - `from_version`: Source version/framework (e.g., "Python 2", "React 16")
    - `to_version`: Target version/framework (e.g., "Python 3", "React 18")
    - `language`: Base programming language (default: "Python")
    - `model`: OpenAI model to use (default: "o4-mini")
 
-9. **write_tests**: Generate unit tests for code
-   - `code`: Source code to test
-   - `description`: Additional testing requirements
+6. **generate_docs**: Create documentation for code
+   - `code`: Optional source code to document (if omitted, analyzes workspace)
+   - `doc_format`: Output format ("docstring", "markdown", "html")
    - `model`: OpenAI model to use (default: "o4-mini")
 
-#### Documentation Tools
+7. **write_openai_agent**: Generate an OpenAI Agent implementation
+   - `name`: Agent name
+   - `instructions`: Agent system prompt
+   - `tool_functions`: List of tool descriptions
+   - `description`: Additional agent details
+   - `model`: OpenAI model to use (default: "o4-mini")
 
-10. **generate_docs**: Create documentation for code
-    - `code`: Source code to document
-    - `doc_format`: Output format ("docstring", "markdown", "html")
-    - `model`: OpenAI model to use (default: "o4-mini")
-
-11. **generate_api_docs**: Generate API documentation or client code
-    - `code`: API implementation code
-    - `framework`: Web framework used (default: "FastAPI")
-    - `output_format`: Output format ("openapi", "swagger", "markdown", "code")
-    - `client_language`: Language for client code (when output_format is "code")
-    - `model`: OpenAI model to use (default: "o4-mini")
-
-#### Agent Generation Tools
-
-12. **write_openai_agent**: Generate an OpenAI Agent implementation
-    - `name`: Agent name
-    - `instructions`: Agent system prompt
-    - `tool_functions`: List of tool descriptions
-    - `description`: Additional agent details
-    - `model`: OpenAI model to use (default: "o4-mini")
+All tools now leverage the filesystem context awareness of the Codex CLI, allowing them to work with the current project's files and directory structure even when no code is explicitly provided.
 
 ### Deprecated Tools
 
@@ -258,72 +235,48 @@ async def main():
     print("Generated code:")
     print(code)
     
-    # Use interactive code generation with feedback
-    improved_code = await client.interactive_code_generation(
-        description="Create a function to calculate Fibonacci numbers",
-        language="Python",
-        feedback="The solution works but could be more efficient with memoization",
-        iteration=2
-    )
-    print("\nImproved code with feedback:")
-    print(improved_code)
-    
     # Assess code quality
-    quality_assessment = await client.assess_code_quality(
-        code=improved_code,
+    quality_assessment = await client.assess_code(
+        code=code,
         language="Python",
         focus_areas=["performance", "readability"]
     )
     print("\nCode quality assessment:")
     print(quality_assessment)
     
-    # Generate API documentation
-    api_code = """
-    from fastapi import FastAPI, Query
-    
-    app = FastAPI()
-    
-    @app.get("/items/")
-    async def read_items(q: str = Query(None, min_length=3, max_length=50)):
-        results = {"items": [{"item_id": "Foo"}, {"item_id": "Bar"}]}
-        if q:
-            results["items"] = [item for item in results["items"] if q in item["item_id"]]
-        return results
-    """
+    # Generate tests
+    tests = await client.write_tests(
+        code=code,
+        description="Include tests for edge cases like negative numbers"
+    )
+    print("\nGenerated tests:")
+    print(tests)
     
     # Explain code for different audiences
-    explanation = await client.explain_code_for_audience(
-        code=api_code,
-        audience="manager",
-        detail_level="brief"
+    explanation = await client.explain(
+        code,
+        audience="beginner",
+        detail_level="detailed"
     )
-    print("\nCode explanation for managers:")
+    print("\nCode explanation for beginners:")
     print(explanation)
     
-    # Generate API documentation
-    docs = await client.generate_api_docs(
-        code=api_code,
-        framework="FastAPI",
-        output_format="openapi"
+    # Generate documentation
+    docs = await client.generate_docs(
+        code=code,
+        doc_format="markdown"
     )
-    print("\nAPI documentation:")
+    print("\nMarkdown documentation:")
     print(docs)
     
-    # Generate code from template
-    template_code = await client.generate_from_template(
-        template_name="api_endpoint",
-        parameters={
-            "endpoint_name": "create_user",
-            "http_method": "POST",
-            "path": "/users",
-            "description": "Create a new user in the system",
-            "request_params": "username: str, email: str, password: str",
-            "response_format": "JSON with user ID and creation timestamp"
-        },
-        language="Python"
+    # Generate an OpenAI agent
+    agent_code = await client.write_openai_agent(
+        name="MathHelper",
+        instructions="You are a helpful math assistant that helps solve mathematical problems.",
+        tool_functions=["calculate", "plot_function", "solve_equation"]
     )
-    print("\nTemplate-based code generation:")
-    print(template_code)
+    print("\nOpenAI Agent Implementation:")
+    print(agent_code)
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -342,18 +295,18 @@ Identical prompts are automatically cached to improve response time and reduce A
 
 ### Error Handling & Retries
 
-The system automatically retries failed API calls with exponential backoff:
+The system automatically handles errors with improved diagnostics:
 
-- Configure with `CODEXMCP_MAX_RETRIES=3` and `CODEXMCP_RETRY_BACKOFF=2.0`
 - Error IDs are included in error messages for easier debugging
-- Specific error types help diagnose issues (rate limits, timeouts, etc.)
+- Specific error types help diagnose issues
 
-### Provider Flexibility
+### Streamlined CLI Integration
 
-Choose between Codex CLI and direct API access:
+All tools now use a dedicated `cli_backend` module for Codex CLI interactions:
 
-- Set `CODEXMCP_USE_CLI=0` to force using the API even when CLI is available
-- Direct API access includes streaming support and better error handling
+- Per-call CLI execution instead of long-lived pipe for improved reliability
+- Automatic filesystem context awareness for all tools
+- Better error handling and logging
 
 ## Troubleshooting
 
@@ -361,6 +314,7 @@ Choose between Codex CLI and direct API access:
 
 1. **"Codex executable path not configured or found"**
    - Ensure the Codex CLI is installed globally with `npm install -g @openai/codex`
+   - Set `CODEX_PATH` environment variable if the binary is in a non-standard location
 
 2. **API Key Issues**
    - Make sure your `OPENAI_API_KEY` is set in the environment or `.env` file
@@ -368,7 +322,7 @@ Choose between Codex CLI and direct API access:
 
 3. **Model Availability**
    - If you see "Model unavailable" errors, check that the specified model exists and is available in your OpenAI account
-
+   - You can specify a different model with the `CODEX_MODEL` environment variable
 
 ## Testing
 

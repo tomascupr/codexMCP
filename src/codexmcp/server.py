@@ -25,7 +25,7 @@ from .logging_cfg import configure_logging
 logger = configure_logging(console=console_logging)
 
 # Import shared singletons
-from .shared import mcp, pipe  # <-- Import from shared.py
+from .shared import mcp  # MCP instance (CodexPipe no longer required)
 
 # Remove direct FastMCP and CodexPipe imports if no longer needed here
 # from fastmcp import FastMCP
@@ -57,13 +57,8 @@ def _ensure_event_loop_policy() -> None:
 def main() -> None:
     """Main entry point for the CodexMCP server."""
     _ensure_event_loop_policy()
-    logger.info("=== CodexMCP Server Starting === PID=%s ===", os.getpid())
+    logger.info("=== CodexMCP Server (v0.1.5) Starting === PID=%s ===", os.getpid())
     logger.info("Console logging is %s", "ENABLED" if console_logging else "DISABLED")
-
-    # Check if pipe initialized successfully (imported from shared.py)
-    if pipe is None:
-        logger.error("Shared CodexPipe failed to initialize. Server cannot start.")
-        sys.exit(1)
 
     try:
         # Import tools here, which will now import mcp/pipe from shared.py
@@ -74,8 +69,7 @@ def main() -> None:
 
         # Log available tools
         tool_names = [
-            "generate_code", "refactor_code", "write_tests", 
-            "explain_code", "generate_docs"
+            "generate_code", "assess_code", "explain", "search_codebase", "write_tests", "write_openai_agent"
         ]
         logger.info("Available tools: %s", ", ".join(tool_names))
         
