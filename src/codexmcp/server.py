@@ -68,7 +68,8 @@ def main() -> None:
     try:
         # Import tools here, which will now import mcp/pipe from shared.py
         logger.info("Importing tools module...")
-        from . import tools  # noqa: F401 pylint: disable=unused-import,import-outside-toplevel
+        import importlib
+        importlib.import_module(f"{__package__}.tools")
         logger.info("Tools module imported successfully.")
 
         # Log available tools
