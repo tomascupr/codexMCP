@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New `cli_backend.py` module for consistent Codex CLI interaction
+- Streamlined tool structure with filesystem context awareness for all tools
+- Simplified public API with core tools: `generate_code`, `assess_code`, `explain`, `write_tests`, etc.
+
+### Changed
+- Removed CodexPipe in favor of per-call CLI execution for better reliability
+- Simplified tools implementation with direct CLI interaction
+- Unified tool structure for better maintainability
+- Updated README to reflect new architecture and simplified tool structure
+
+### Removed
+- Removed dual-backend approach (CLI and API) in favor of CLI-only implementation
+- Deprecated several redundant tools in favor of a more unified approach
+
 ## [0.1.5] - 2025-05-09
 
 ### Added
