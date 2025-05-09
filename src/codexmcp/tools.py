@@ -8,6 +8,8 @@ import tempfile
 import importlib.resources  # Use importlib.resources
 from typing import Any, Dict, List, Literal, Optional
 import uuid
+import asyncio # Add asyncio for subprocess
+import shutil # Add shutil for which function
 
 # ---------------------------------------------------------------------------
 # Optional OpenAI SDK import (lazy fallback when Codex CLI absent)
@@ -152,28 +154,95 @@ async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str:
 
 
 async def _query_codex_via_pipe(ctx: Context, prompt: str, *, model: str) -> str:
-    """Query the Codex CLI using the pipe interface."""
-    if pipe is None:
-        raise CodexBaseError("Codex CLI is not initialized")
+    """Query the Codex CLI by direct execution, processing a stream of JSON responses."""
+    
+    # This function now assumes direct execution of 'codex' with the prompt as an argument.
+    # It will need access to the codex executable path and base arguments.
+    # For this example, we'll try to reconstruct or assume access.
+    # A more robust solution would involve shared.py exposing these.
+    
+    codex_exe = getattr(config, "codex_executable_path", shutil.which("codex")) # Attempt to get from config or find in PATH
+    if not codex_exe:
+        raise CodexBaseError("Codex executable path not configured or found.")
+
+    # Base arguments for the codex CLI, excluding --pipe and dummy prompt
+    # The prompt itself will be inserted after -q
+    # Arguments like --json can usually precede -q
+    pre_prompt_args = ["--json"]
+    post_prompt_args = [
+        "--approval-mode=full-auto",
+        "--disable-shell"
+        # model arg clarification still pending, see previous comments
+    ]
+
+    # Construct the command: codex_exe <pre_args> -q <prompt> <post_args>
+    cmd = [codex_exe] + pre_prompt_args + ["-q", f'"{prompt}"'] + post_prompt_args
+    logger.info(f"Executing Codex CLI: {' '.join(cmd)}")
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    stdout, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        err_output = stderr.decode().strip() if stderr else "No stderr output"
+        logger.error(f"Codex CLI failed with exit code {process.returncode}: {err_output}")
+        raise CodexBaseError(f"Codex CLI execution failed: {err_output}")
+
+    if not stdout:
+        raise CodexBaseError("Codex CLI returned no output.")
+
+    # Process the stream of JSON objects from stdout
+    # Each JSON object is expected to be on a new line.
+    lines = stdout.decode().strip().split('\n')
+    final_completion = None
+
+    for line_num, line_content in enumerate(lines):
+        line_content = line_content.strip()
+        if not line_content:
+            continue
         
-    request = {"prompt": prompt, "model": model}
-    await pipe.send(request)
+        # Skip JSON validation and parse directly
+        response_obj = json.loads(line_content)
+        logger.debug(f"Codex CLI JSON response line {line_num + 1}: {response_obj}")
 
-    try:
-        raw = await pipe.recv(progress_cb=getattr(ctx, "progress", None))
-        response: dict[str, Any] = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        logger.exception("Failed to decode Codex JSON response")
-        raise CodexBaseError("Codex returned invalid JSON") from exc
+        if response_obj.get("status") == "completed":
+            # Found the completed response, extract content
+            response_keys = ["completion", "text", "response", "content"]
+            for key in response_keys:
+                if key in response_obj:
+                    if key == "content":
+                        content_value = response_obj["content"]
+                        if isinstance(content_value, list) and content_value and isinstance(content_value[0], dict) and "text" in content_value[0]:
+                            final_completion = content_value[0]["text"].lstrip("\n")
+                        else:
+                            final_completion = str(content_value).lstrip("\n")
+                    else:
+                        final_completion = str(response_obj[key]).lstrip("\n")
+                    logger.info(f"Codex CLI completed. Extracted from key '{key}'.")
+                    break
+            if final_completion is not None:
+                break # Exit loop once completed content is found
+            else:
+                logger.warning("Codex CLI 'completed' status found, but no known content key ('completion', 'text', 'response').")
+                # Continue in case there are multiple 'completed' messages or content is later
 
-    # Process response in consistent order
-    response_keys = ["completion", "text", "response"]
-    for key in response_keys:
-        if key in response:
-            return str(response[key]).lstrip("\n")
+        elif "type" in response_obj: # Log other types of messages, e.g., reasoning
+             logger.info(f"Codex CLI intermediate message: Type '{response_obj['type']}', Content: {response_obj}")
+        
+        # Potentially call progress_cb here with intermediate updates
+        if hasattr(ctx, "progress") and callable(ctx.progress):
+            # Determine what to send to progress, maybe the whole object or a summary
+            await ctx.progress(f"CLI status: {response_obj.get('type', 'processing')}")
 
-    logger.error("Unexpected Codex response structure: %s", response)
-    raise CodexBaseError("Codex response missing expected fields")
+    if final_completion is not None:
+        return final_completion
+    else:
+        logger.error("Codex CLI stream ended without a 'completed' status message containing usable content.")
+        raise CodexBaseError("Codex CLI did not return a usable 'completed' response.")
 
 
 @mcp.tool()
