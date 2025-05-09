@@ -66,7 +66,7 @@ The `generate_from_template` tool enables code generation using customizable tem
 
 4. **(Optional) Python-only fallback**
 
-   If you *don’t* want to install the Node-based Codex CLI you can instead
+   If you *don't* want to install the Node-based Codex CLI you can instead
    install the OpenAI Python SDK extra:
 
    ```bash
@@ -113,6 +113,16 @@ codexmcp
 ```
 
 The server will start listening on port 8080 (by default). Your applications can now make requests to the server's API endpoints.
+
+### Developer Notes
+
+If you're developing or extending CodexMCP, be aware of these implementation details:
+
+1. **Prompt Templates**: All prompt templates are stored in the `src/codexmcp/prompt_files/` directory and are loaded lazily when first needed.
+
+2. **o4-mini Model Support**: The system has special handling for the `o4-mini` model, including proper configuration of `max_completion_tokens` and temperature settings.
+
+3. **CLI Fallback**: The system tries to use the Codex CLI first for better performance, falling back to the OpenAI API when necessary.
 
 ### How It Works
 
