@@ -1,5 +1,10 @@
 # CodexMCP
 
+[![PyPI version](https://badge.fury.io/py/codexmcp.svg)](https://badge.fury.io/py/codexmcp)
+[![GitHub release](https://img.shields.io/github/v/release/tomascupr/codexMCP)](https://github.com/tomascupr/codexMCP/releases)
+
+Current version: **0.1.5**
+
 ## What is CodexMCP?
 
 CodexMCP is a service that gives your applications access to AI coding capabilities without needing to build complex integrations. It's a server that exposes powerful code-related AI tools through a simple, standardized API.
@@ -52,6 +57,9 @@ The `generate_from_template` tool enables code generation using customizable tem
      ```bash
      npm install -g @openai/codex
      ```
+     
+     **Note**: If you don't have access to the Codex CLI, you can still use 
+     CodexMCP with the OpenAI API fallback (see Python-only fallback below).
 
 2. **Install CodexMCP**:
 
@@ -63,8 +71,9 @@ The `generate_from_template` tool enables code generation using customizable tem
 
    ```bash
    pip install codexmcp[test]
+   ```
 
-4. **(Optional) Python-only fallback**
+3. **(Optional) Python-only fallback**
 
    If you *don't* want to install the Node-based Codex CLI you can instead
    install the OpenAI Python SDK extra:
@@ -77,9 +86,8 @@ The `generate_from_template` tool enables code generation using customizable tem
    Make sure `OPENAI_API_KEY` is set in your environment or `.env` file.  At
    runtime CodexMCP will automatically fall back to the OpenAI ChatCompletion
    API whenever the `codex` executable cannot be found.
-   ```
 
-3. **Environment Setup**:
+4. **Environment Setup**:
    - Create a `.env` file in your project root.
    - Add your OpenAI API key:
 
@@ -118,11 +126,13 @@ The server will start listening on port 8080 (by default). Your applications can
 
 If you're developing or extending CodexMCP, be aware of these implementation details:
 
-1. **Prompt Templates**: All prompt templates are stored in the `src/codexmcp/prompt_files/` directory and are loaded lazily when first needed.
+1. **Prompt Templates**: All prompt templates are stored in the `src/codexmcp/prompt_files/` directory and are loaded lazily when first needed. If you want to add custom templates, add `.txt` files to this directory.
 
-2. **o4-mini Model Support**: The system has special handling for the `o4-mini` model, including proper configuration of `max_completion_tokens` and temperature settings.
+2. **o4-mini Model Support**: The system has special handling for the `o4-mini` model, including proper configuration of `max_completion_tokens` and temperature settings (temperature is always set to 1.0 for o4-mini).
 
 3. **CLI Fallback**: The system tries to use the Codex CLI first for better performance, falling back to the OpenAI API when necessary.
+
+4. **Custom Templates**: To add custom templates, place them in `src/codexmcp/templates/` with a `.txt` extension. Templates use Python's standard string formatting with named placeholders like `{parameter_name}`.
 
 ### How It Works
 
@@ -344,6 +354,21 @@ Choose between Codex CLI and direct API access:
 
 - Set `CODEXMCP_USE_CLI=0` to force using the API even when CLI is available
 - Direct API access includes streaming support and better error handling
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Codex executable path not configured or found"**
+   - Ensure the Codex CLI is installed globally with `npm install -g @openai/codex`
+
+2. **API Key Issues**
+   - Make sure your `OPENAI_API_KEY` is set in the environment or `.env` file
+   - Check that the key has the correct permissions and hasn't expired
+
+3. **Model Availability**
+   - If you see "Model unavailable" errors, check that the specified model exists and is available in your OpenAI account
+
 
 ## Testing
 
