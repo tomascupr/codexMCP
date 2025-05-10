@@ -90,7 +90,6 @@ if not hasattr(mcp, "get_tool_schemas") or not callable(getattr(mcp, "get_tool_s
         if not schemas:
             # These are the tools we know exist in our codebase
             known_tools = [
-                "search_codebase",
                 "code_generate", 
                 "describe_codebase",
                 "review_code"
