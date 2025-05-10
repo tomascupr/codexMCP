@@ -145,218 +145,6 @@ async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str:
         raise CodexBaseError(str(exc), "cli_error") from exc
 
 
-async def generate_code(
-    ctx: Context, description: str, language: str = "Python", model: str | None = None
-) -> str:
-    """Generate source code as described. Uses Codex CLI with full FS context."""
-    model_to_use = model or config.default_model
-    prompt = f"Generate {language} code that fulfils the following description:\n{description.strip()}"
-    return await _query_codex(ctx, prompt, model=model_to_use)
-
-
-async def assess_code_quality(
-    ctx: Context,
-    code: str | None = None,
-    language: str = "Python",
-    focus_areas: List[str] | None = None,
-    extra_prompt: str | None = None,
-    model: str | None = None,
-) -> str:
-    """Ask Codex to review code quality.
-
-    If *code* is omitted the CLI can read the workspace; *extra_prompt* lets the
-    caller provide free-form instructions (e.g. "especially security aspects").
-    """
-
-    model_to_use = model or config.default_model
-
-    if code:
-        if _is_probably_code(code):
-            prompt = "Assess the quality of the following code:\n\n" + code.strip()
-        else:
-            # treat provided text as high-level instruction
-            prompt = code.strip()
-    else:
-        prompt = "Assess the overall codebase quality."
-
-    if focus_areas:
-        prompt += "\n\nFocus on: " + ", ".join(focus_areas)
-
-    if extra_prompt:
-        prompt += "\n\n" + extra_prompt.strip()
-
-    return await _query_codex(ctx, prompt, model=model_to_use)
-
-
-async def analyze_code_context(
-    ctx: Context,
-    code: str,
-    file_path: str = "",
-    surrounding_files: List[str] = [],
-    model: str = None,
-) -> str:
-    """Analyze code with awareness of its surrounding context.
-
-    Args:
-        ctx: The FastMCP context.
-        code: The code to analyze.
-        file_path: Path to the file containing the code (for context).
-        surrounding_files: List of related file paths to consider for context.
-        model: The OpenAI model to use.
-
-    Returns:
-        Analysis with context-aware insights and suggestions.
-    """
-    model_to_use = model or config.default_model
-    logger.info("TOOL REQUEST: analyze_code_context - model=%s", model_to_use)
-
-    try:
-        # Gather context from surrounding files if provided
-        context_snippets = []
-        if surrounding_files:
-            context_snippets.append("## Related Files Context")
-            for file_item in surrounding_files[:3]:  # Limit to 3 files to avoid token limits
-                try:
-                    with open(file_item, "r", encoding='utf-8') as f:
-                        content = f.read()
-                        # Include just enough context (first 50 lines or so)
-                        content_preview = "\n".join(content.split("\n")[:50])
-                        context_snippets.append(
-                            f"### {file_item}\n```\n{content_preview}\n```"
-                        )
-                except Exception as e:
-                    context_snippets.append(f"### {file_item}\nError reading file: {str(e)}")
-
-        context_text = "\n\n".join(context_snippets)
-
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get(
-            "analyze_code_context",
-            code=code.strip(),
-            file_path=file_path,
-            context=context_text,
-        )
-
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model_to_use)
-    except Exception as e:
-        logger.error(f"Failed to analyze code context: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Code context analysis failed: {str(e)}")
-
-
-async def interactive_code_generation(
-    ctx: Context,
-    description: str,
-    language: str = "Python",
-    feedback: str = "",
-    iteration: int = 1,
-    model: str = None,
-) -> str:
-    """Generate code with an iterative feedback loop.
-
-    Args:
-        ctx: The FastMCP context.
-        description: Task description.
-        language: Programming language.
-        feedback: Feedback on previous iterations.
-        iteration: Current iteration number.
-        model: The OpenAI model to use.
-
-    Returns:
-        Generated code with explanation of changes based on feedback.
-    """
-    model_to_use = model or config.default_model
-    logger.info(
-        "TOOL REQUEST: interactive_code_generation - language=%s, iteration=%d, model=%s",
-        language,
-        iteration,
-        model_to_use,
-    )
-
-    try:
-        # Adjust prompt based on whether this is the first iteration or a refinement
-        feedback_section = ""
-        if iteration > 1 and feedback:
-            feedback_section = f"\n\n## Previous Feedback\n{feedback.strip()}"
-
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get(
-            "interactive_code_generation",
-            description=description.strip(),
-            language=language,
-            feedback_section=feedback_section,
-            iteration=iteration or 1,
-        )
-
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model_to_use)
-    except Exception as e:
-        logger.error(f"Failed to generate code interactively: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Interactive code generation failed: {str(e)}")
-
-
-async def generate_from_template(
-    ctx: Context,
-    template_name: str,
-    parameters: Dict[str, str],
-    language: str = "Python",
-    model: str = None,
-) -> str:
-    """Generate code using customizable templates.
-
-    Args:
-        ctx: The FastMCP context.
-        template_name: Name of the template to use.
-        parameters: Dictionary of parameters to fill in the template.
-        language: Programming language.
-        model: The OpenAI model to use.
-
-    Returns:
-        Generated code based on the template and parameters.
-    """
-    model_to_use = model or config.default_model
-    logger.info(
-        "TOOL REQUEST: generate_from_template - template=%s, language=%s, model=%s",
-        template_name,
-        language,
-        model_to_use,
-    )
-
-    try:
-        # Load the template - this could be from a templates directory
-        try:
-            template_content = _load_template(template_name)
-        except Exception as e:
-            logger.warning(
-                "Failed to load template '%s': %s. Using generic template.",
-                template_name,
-                e,
-            )
-            template_content = _load_prompt("generic_template")
-
-        # Format the template with parameters
-        formatted_template = template_content
-
-        for key, value in parameters.items():
-            placeholder = f"{{{key}}}"
-            formatted_template = formatted_template.replace(placeholder, value)
-
-        # Add language information
-        prompt = f"# Template: {template_name}\n# Language: {language}\n\n{formatted_template}"
-
-        # Pass to enhanced query function
-        return await _query_codex(ctx, prompt, model=model_to_use)
-    except Exception as e:
-        logger.error(f"Failed to generate from template: {str(e)}", exc_info=True)
-        if isinstance(e, CodexBaseError):
-            raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"Template code generation failed: {str(e)}")
-
-
 @mcp.tool()
 async def search_codebase(
     ctx: Context,
@@ -483,90 +271,177 @@ async def search_codebase(
         raise exceptions.ToolError(f"Codebase search failed: {str(e)}")
 
 
-async def generate_api_docs(
+@mcp.tool()
+async def code_generate(
     ctx: Context,
-    code: str,
-    framework: str = "FastAPI",
-    output_format: Literal["openapi", "swagger", "markdown", "code"] = "openapi",
-    client_language: str = "Python",
-    model: str = None,
+    description: str,
+    language: str = "Python",
+    template_name: str = "",
+    parameters: Dict[str, str] | None = None,
+    feedback: str = "",
+    iteration: int = 1,
+    model: str | None = None,
 ) -> str:
-    """Generate API documentation or client code from API implementation code.
+    """Generate code based on a description, template, or feedback.
 
     Args:
         ctx: The FastMCP context.
-        code: The API implementation code to document.
-        framework: The web framework used (e.g., 'FastAPI', 'Flask', 'Express').
-        output_format: The desired documentation format ('openapi', 'swagger', 'markdown', or 'code').
-        client_language: The language for client code generation (when output_format is 'code').
-        model: The OpenAI model to use.
+        description: What code to generate.
+        language: Programming language to use.
+        template_name: Optional template name to use.
+        parameters: Parameters for the template.
+        feedback: Feedback on previous iterations.
+        iteration: Current iteration number.
+        model: The LLM model to use.
 
     Returns:
-        Generated API documentation or client code based on the specified format.
+        Generated code with explanations.
     """
     model_to_use = model or config.default_model
-    logger.info(
-        "TOOL REQUEST: generate_api_docs - framework=%s, output_format=%s, model=%s",
-        framework,
-        output_format,
-        model_to_use,
-    )
-
+    parameters = parameters or {}
+    
     try:
-        # Validate output_format
-        valid_formats = ["openapi", "swagger", "markdown", "code"]
-        if output_format not in valid_formats:
-            output_format = "openapi"  # Default if invalid
-            logger.warning(
-                f"Invalid output_format '{output_format}', defaulting to 'openapi'"
+        # Construct the prompt based on the provided parameters
+        if template_name:
+            logger.info(
+                "TOOL REQUEST: code_generate with template - template=%s, language=%s",
+                template_name,
+                language
             )
+            
+            # Load the template
+            try:
+                template_content = _load_template(template_name)
+            except Exception as e:
+                logger.warning(
+                    "Failed to load template '%s': %s. Using generic template.",
+                    template_name,
+                    e,
+                )
+                template_content = _load_prompt("generic_template")
 
-        # Get formatted prompt using prompt manager
-        prompt = prompts.get(
-            "generate_api_docs",
-            code=code.strip(),
-            framework=framework,
-            output_format=output_format,
-            client_language=client_language,
-        )
+            # Format the template with parameters
+            formatted_template = template_content
+            for key, value in parameters.items():
+                placeholder = f"{{{key}}}"
+                formatted_template = formatted_template.replace(placeholder, value)
 
-        # Pass to enhanced query function
+            # Build the prompt with template
+            prompt = f"# Template: {template_name}\n# Language: {language}\n\n{formatted_template}"
+            
+        elif feedback or iteration > 1:
+            logger.info(
+                "TOOL REQUEST: code_generate with feedback - language=%s, iteration=%d",
+                language,
+                iteration
+            )
+            
+            # Adjust prompt based on whether this is the first iteration or a refinement
+            feedback_section = ""
+            if iteration > 1 and feedback:
+                feedback_section = f"\n\n## Previous Feedback\n{feedback.strip()}"
+
+            # Get formatted prompt for interactive generation
+            prompt = prompts.get(
+                "interactive_code_generation",
+                description=description.strip(),
+                language=language,
+                feedback_section=feedback_section,
+                iteration=iteration or 1,
+            )
+            
+        else:
+            # Basic code generation
+            logger.info(
+                "TOOL REQUEST: code_generate - language=%s",
+                language
+            )
+            prompt = f"Generate {language} code that fulfils the following description:\n{description.strip()}"
+        
+        # Execute the prompt with Codex
         return await _query_codex(ctx, prompt, model=model_to_use)
     except Exception as e:
-        logger.error(f"Failed to generate API docs: {str(e)}", exc_info=True)
+        logger.error(f"Failed in code_generate: {str(e)}", exc_info=True)
         if isinstance(e, CodexBaseError):
             raise  # Pass through our custom errors
-        raise exceptions.ToolError(f"API documentation generation failed: {str(e)}")
+        raise exceptions.ToolError(f"Code generation failed: {str(e)}")
 
 
-# Helper to build a very simple prompt from arbitrary keyword arguments
-def _simple_prompt(tool_name: str, **kwargs) -> str:
-    """Create a simple prompt string for a given tool and parameters.
-
-    The idea is to avoid rigid templates – we just list each argument so the
-    model can infer intent.  Empty / None values are skipped.
-    """
-    # Find the tool function by name to extract its docstring (description)
-    tool_func = globals().get(tool_name)
-    if tool_func and hasattr(tool_func, "__doc__"):
-        description = tool_func.__doc__.strip()
-    else:
-        description = ""
-
-    lines = [tool_name.replace("_", " ").title() + ":"]
-    for key, value in kwargs.items():
-        if key == "ctx" or key == "model":
-            continue
-        if value in (None, "", [], {}):
-            continue
-        if isinstance(value, (list, dict)):
-            import json as _json
-
-            val_str = _json.dumps(value, indent=2)
+@mcp.tool()
+async def describe_codebase(
+    ctx: Context,
+    subject: str | None = None,
+    audience: str = "developer",
+    detail_level: str = "medium", # brief, medium, detailed
+    model: str | None = None,
+) -> str:
+    """Explain the repository, a file, or a code snippet."""
+    model_to_use = model or config.default_model
+    logger.info("TOOL REQUEST: describe_codebase - subject=%s, detail_level=%s", 
+                subject or "repository", detail_level)
+    
+    try:
+        prompt_text = ""
+        if subject:
+            # Basic check if it might be a file path that exists
+            if os.path.isfile(subject): # Checks if it's an existing regular file
+                try:
+                    with open(subject, "r", encoding='utf-8') as f:
+                        file_content = f.read()
+                    # Limit context sent to LLM for very large files
+                    prompt_text = f"Explain the following code from file '{subject}' to a {audience} in {detail_level} detail (be concise if the code is long):\n\n{file_content[:3000]}" 
+                except Exception as e:
+                    logger.warning(f"Could not read file {subject} for describe_codebase: {e}")
+                    # Fallback to treating subject as a general query/snippet
+                    prompt_text = f"Explain the following code, concept, or file path '{subject}' to a {audience} in {detail_level} detail."
+            else: # Assume it's a code snippet or question if not an existing file
+                prompt_text = f"Explain the following code or concept '{subject}' to a {audience} in {detail_level} detail."
         else:
-            val_str = str(value)
-        lines.append(f"{key}:\n{val_str}")
-    return "\n\n".join(lines) + "\n\n" + description
+            prompt_text = f"Describe the current repository's architecture to a {audience} in {detail_level} detail."
+            
+        return await _query_codex(ctx, prompt_text, model=model_to_use)
+    except Exception as e:
+        logger.error(f"Failed in describe_codebase: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code description failed: {str(e)}")
+
+
+@mcp.tool()
+async def review_code(
+    ctx: Context,
+    code: str | None = None,
+    language: str = "Python",
+    focus_areas: List[str] | None = None,
+    extra_prompt: str | None = None,
+    model: str | None = None,
+) -> str:
+    """Assess code quality, security, style or other aspects."""
+    model_to_use = model or config.default_model
+    logger.info("TOOL REQUEST: review_code - language=%s", language)
+    
+    try:
+        if code:
+            if _is_probably_code(code):
+                prompt = "Assess the quality of the following code:\n\n" + code.strip()
+            else:
+                # treat provided text as high-level instruction
+                prompt = code.strip()
+        else:
+            prompt = "Assess the overall codebase quality."
+
+        if focus_areas:
+            prompt += "\n\nFocus on: " + ", ".join(focus_areas)
+
+        if extra_prompt:
+            prompt += "\n\n" + extra_prompt.strip()
+
+        return await _query_codex(ctx, prompt, model=model_to_use)
+    except Exception as e:
+        logger.error(f"Failed in review_code: {str(e)}", exc_info=True)
+        if isinstance(e, CodexBaseError):
+            raise  # Pass through our custom errors
+        raise exceptions.ToolError(f"Code review failed: {str(e)}")
 
 
 def _is_probably_code(text: str) -> bool:
@@ -588,107 +463,3 @@ def _is_probably_code(text: str) -> bool:
     lines = text.split("\n")
     code_lines = [line for line in lines if any(tok in line for tok in code_indicators)]
     return len(code_lines) > len(lines) / 3 and len(text) < 1000
-
-
-# ---------------------------------------------------------------------------
-# Simplified public tool set (v1)
-# ---------------------------------------------------------------------------
-
-@mcp.tool()
-async def code_generate(
-    ctx: Context,
-    description: str,
-    language: str = "Python",
-    template_name: str = "",
-    parameters: Dict[str, str] | None = None,
-    feedback: str = "",
-    iteration: int = 1,
-    model: str | None = None,
-) -> str:
-    """Unified entry point for all code-generation tasks.
-
-    Behaviour:
-    • If `template_name` is provided → delegates to `generate_from_template`.
-    • Else if feedback/iteration suggest refinement → delegates to
-      `interactive_code_generation`.
-    • Else → basic source creation via `generate_code`.
-    """
-    parameters = parameters or {}
-
-    if template_name:
-        return await generate_from_template(
-            ctx,
-            template_name=template_name,
-            parameters=parameters,
-            language=language,
-            model=model,
-        )
-
-    if feedback or iteration > 1:
-        return await interactive_code_generation(
-            ctx,
-            description=description,
-            language=language,
-            feedback=feedback,
-            iteration=iteration,
-            model=model,
-        )
-
-    return await generate_code(
-        ctx, description=description, language=language, model=model
-    )
-
-
-@mcp.tool()
-async def describe_codebase(
-    ctx: Context,
-    subject: str | None = None,
-    audience: str = "developer",
-    detail_level: str = "medium", # brief, medium, detailed
-    model: str | None = None,
-) -> str:
-    """Explain the repository, a file, or a code snippet."""
-    model_to_use = model or config.default_model
-    prompt_text = ""
-
-    if subject:
-        # Basic check if it might be a file path that exists
-        if os.path.isfile(subject): # Checks if it's an existing regular file
-            try:
-                with open(subject, "r", encoding='utf-8') as f:
-                    file_content = f.read()
-                # Limit context sent to LLM for very large files
-                prompt_text = f"Explain the following code from file '{subject}' to a {audience} in {detail_level} detail (be concise if the code is long):\n\n{file_content[:3000]}" 
-            except Exception as e:
-                logger.warning(f"Could not read file {subject} for describe_codebase: {e}")
-                # Fallback to treating subject as a general query/snippet
-                prompt_text = f"Explain the following code, concept, or file path '{subject}' to a {audience} in {detail_level} detail."
-        else: # Assume it's a code snippet or question if not an existing file
-             prompt_text = f"Explain the following code or concept '{subject}' to a {audience} in {detail_level} detail."
-    else:
-        prompt_text = f"Describe the current repository's architecture to a {audience} in {detail_level} detail."
-        
-    return await _query_codex(ctx, prompt_text, model=model_to_use)
-
-
-@mcp.tool()
-async def review_code(
-    ctx: Context,
-    code: str | None = None,
-    language: str = "Python",
-    focus_areas: List[str] | None = None,
-    extra_prompt: str | None = None,
-    model: str | None = None,
-) -> str:
-    """Assess code quality, security, style or other aspects.
-
-    Wrapper around `assess_code_quality` so the public surface stays tiny.
-    """
-    return await assess_code_quality(
-        ctx,
-        code=code,
-        language=language,
-        focus_areas=focus_areas,
-        extra_prompt=extra_prompt,
-        model=model,
-    )
