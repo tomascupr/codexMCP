@@ -76,10 +76,11 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        text=True,
     )
 
-    stdout, stderr = await proc.communicate()
+    stdout_bytes, stderr_bytes = await proc.communicate()
+    stdout = stdout_bytes.decode('utf-8', errors='ignore')
+    stderr = stderr_bytes.decode('utf-8', errors='ignore')
 
     if proc.returncode != 0:
         raise CodexCLIError(stderr.strip() or "Codex CLI exited with non-zero status")
