@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Real-time streaming for all OpenAI API responses
+- Improved user experience with immediate token display
+- Console output for streaming progress
+
+### Changed
+- Updated client.py to enable streaming by default
+- Modified tools.py to properly handle streaming responses
+- Enhanced progress reporting for streaming responses
+
 ## [0.1.6] - 2025-05-20
 
 ### Added

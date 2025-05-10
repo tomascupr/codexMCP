@@ -107,8 +107,11 @@ async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
 
             if token:
                 content += token
+                # Both report progress to context and print to console
                 if hasattr(ctx, "progress") and callable(ctx.progress):
                     await ctx.progress(token)
+                # Also print directly to console for real-time feedback
+                print(token, end="", flush=True)
 
         return content
     except Exception as e:

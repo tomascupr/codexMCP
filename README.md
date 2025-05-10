@@ -19,38 +19,42 @@ A minimal FastMCP server wrapping the [OpenAI Codex CLI](https://github.com/open
 
 CodexMCP has been enhanced with several key improvements:
 
-### 1. Streamlined Codex CLI Integration
+### 1. Real-time Streaming Responses
+
+The latest update enables real-time streaming of responses when using the OpenAI API. This provides immediate feedback as tokens are generated, significantly improving the user experience for all tools.
+
+### 2. Streamlined Codex CLI Integration
 
 The latest update removes the long-lived CodexPipe in favor of per-call CLI execution, improving reliability and simplifying the architecture. All tools now route through a new dedicated `cli_backend` module.
 
-### 2. Simplified Tool Structure
+### 3. Simplified Tool Structure
 
 The tools API has been reorganized for clarity and ease of use, with a focus on the most essential coding tasks:
 - `code_generate`: Unified entry point for all code-generation tasks.
 - `review_code`: Assess code quality, security, style or other aspects.
 - `describe_codebase`: Explain the repository, a file, or a code snippet.
 
-### 3. Context-Aware Code Analysis
+### 4. Context-Aware Code Analysis
 
 The `describe_codebase` tool (when provided a file path) allows you to analyze code with awareness of its surrounding context.
 
-### 4. Interactive Code Generation with Feedback Loop
+### 5. Interactive Code Generation with Feedback Loop
 
 The `code_generate` tool, when provided with feedback or an iteration count, enables an iterative approach to code generation, where you can provide feedback on previous iterations to refine the results.
 
-### 5. Advanced Code Quality Assessment
+### 6. Advanced Code Quality Assessment
 
 The `review_code` tool provides detailed code quality assessments with actionable suggestions for improvement, focusing on specific areas like performance, readability, or security.
 
-### 6. Audience-Targeted Code Explanations
+### 7. Audience-Targeted Code Explanations
 
 The `describe_codebase` tool provides code explanations tailored to different audiences (developers, managers, beginners) with customizable detail levels.
 
-### 7. Code Migration and Modernization
+### 8. Code Migration and Modernization
 
 Functionality for code migration and modernization can be achieved using `code_generate` with appropriate descriptions.
 
-### 8. Template-Based Code Generation
+### 9. Template-Based Code Generation
 
 The `code_generate` tool, when provided a `template_name` and `parameters`, enables code generation using customizable templates, increasing productivity for common tasks.
 
@@ -248,6 +252,14 @@ if __name__ == "__main__":
 ## Advanced Features
 
 CodexMCP includes several advanced features to enhance reliability and performance:
+
+### Real-time Streaming
+
+API responses are streamed in real-time, displaying tokens as they're generated:
+
+- Improves user experience with immediate feedback
+- Shows progress for longer generations
+- Works with all tools using the OpenAI API
 
 ### Response Caching
 

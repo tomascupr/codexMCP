@@ -112,7 +112,7 @@ class LLMClient:
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temp,
-            "stream": False,  # Maintain non-streaming for compatibility
+            "stream": True,  # Enable streaming for all requests
         }
 
         # Adapt max_tokens to max_completion_tokens (already handled for o4-mini case indirectly)
@@ -128,18 +128,27 @@ class LLMClient:
         else:  # General default
             api_params["max_completion_tokens"] = 4096
 
-        # Remove original max_tokens from params if it was used to avoid conflicts,
-        # or if other params need more complex mapping later.
-        # For now, we are constructing api_params directly.
-
         try:
-            chat_resp = await self.client.chat.completions.create(**api_params)
+            # Get streaming response from OpenAI
+            stream = await self.client.chat.completions.create(**api_params)
+            content = ""
 
-            # Extract and normalize response text (guard against None)
-            content: Optional[str] = getattr(
-                chat_resp.choices[0].message, "content", None
-            )  # type: ignore[attr-defined]
-            return (content or "").lstrip("\n")
+            # Process each chunk as it arrives
+            async for chunk in stream:
+                delta = getattr(chunk.choices[0], "delta", None)
+                token = ""
+
+                if delta and hasattr(delta, "content"):
+                    token = delta.content or ""
+                elif hasattr(chunk.choices[0].message, "content"):
+                    token = chunk.choices[0].message.content or ""
+
+                if token:
+                    content += token
+                    # Print token to console for real-time feedback
+                    print(token, end="", flush=True)
+
+            return content.lstrip("\n")
 
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
