@@ -86,65 +86,17 @@ if not hasattr(mcp, "get_tool_schemas") or not callable(getattr(mcp, "get_tool_s
             if schemas:
                 break
 
-        # ---- Secondary fallback: introspect common FastMCP 2.x attributes ----
+        # If no tools found via introspection, just return our known tools
         if not schemas:
-            for attr_name in (
-                "_tool_schemas",
-                "tool_schemas",
-                "_tool_map",
-                "tool_map",
-                "_tool_registry",
-            ):
-                tool_attr = getattr(mcp, attr_name, None)
-                if not tool_attr:
-                    continue
-
-                # tool_attr may be a list of schema dicts
-                if isinstance(tool_attr, list):
-                    for item in tool_attr:
-                        if isinstance(item, dict) and item.get("name"):
-                            schemas.append({"name": item["name"]})
-                    if schemas:
-                        break
-                # or a dict mapping name->schema
-                if isinstance(tool_attr, dict):
-                    for name, item in tool_attr.items():
-                        # Prefer explicit schema dict if available
-                        if isinstance(item, dict) and item.get("name"):
-                            schemas.append({"name": item["name"]})
-                        else:
-                            schemas.append({"name": name})
-                    if schemas:
-                        break
-
-        # ---- Tertiary fallback: static scan of our tools module ----
-        if not schemas:
-            try:
-                import importlib, inspect
-                tools_mod = importlib.import_module(f"{__package__}.tools")
-                
-                # First pass: look for functions with @mcp.tool() decorator
-                # This is more reliable than looking at all functions
-                tool_decorated_names = set()
-                for name, obj in inspect.getmembers(tools_mod, inspect.isfunction):
-                    if hasattr(obj, '__wrapped__') and getattr(obj, '__qualname__', '').startswith('tool.<locals>'):
-                        # This is likely a function decorated with @mcp.tool()
-                        tool_decorated_names.add(name)
-                
-                # If we found decorated functions, use only those
-                if tool_decorated_names:
-                    for name in tool_decorated_names:
-                        schemas.append({"name": name})
-                else:
-                    # Fallback to previous behavior if no decorated functions found
-                    for name, obj in inspect.getmembers(tools_mod, inspect.isfunction):
-                        if obj.__module__ != tools_mod.__name__:
-                            continue  # Skip re-exported names
-                        if name.startswith("_"):
-                            continue  # Skip privates/helpers
-                        schemas.append({"name": name})
-            except Exception as scan_exc:  # pragma: no cover – best-effort fallback
-                logger.debug("Tool module introspection failed: %s", scan_exc)
+            # These are the tools we know exist in our codebase
+            known_tools = [
+                "search_codebase",
+                "code_generate", 
+                "describe_codebase",
+                "review_code"
+            ]
+            for name in known_tools:
+                schemas.append({"name": name})
 
         return schemas
 
