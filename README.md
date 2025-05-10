@@ -26,24 +26,22 @@ The latest update removes the long-lived CodexPipe in favor of per-call CLI exec
 ### 2. Simplified Tool Structure
 
 The tools API has been reorganized for clarity and ease of use, with a focus on the most essential coding tasks:
-- `generate_code`: Create new code across languages
-- `assess_code`: Evaluate and improve existing code
-- `explain`: Provide context-aware explanations 
-- `search_codebase`: Find relevant code sections
-- `write_tests`: Generate comprehensive test suites
-- `write_openai_agent`: Create OpenAI agent implementations
+- `code_generate`: Unified entry point for all code-generation tasks.
+- `review_code`: Assess code quality, security, style or other aspects.
+- `describe_codebase`: Explain the repository, a file, or a code snippet.
+- `search_codebase`: Search and analyze code across multiple files based on natural language query.
 
 ### 3. Context-Aware Code Analysis
 
-The new `analyze_code_context` tool allows you to analyze code with awareness of its surrounding context, including related files. This provides deeper insights into how code fits into the broader architecture.
+The `describe_codebase` tool (when provided a file path) and `search_codebase` tool allow you to analyze code with awareness of its surrounding context.
 
 ### 4. Interactive Code Generation with Feedback Loop
 
-The `interactive_code_generation` tool enables an iterative approach to code generation, where you can provide feedback on previous iterations to refine the results.
+The `code_generate` tool, when provided with feedback or an iteration count, enables an iterative approach to code generation, where you can provide feedback on previous iterations to refine the results.
 
 ### 5. Advanced Code Quality Assessment
 
-The `assess_code_quality` tool provides detailed code quality assessments with actionable suggestions for improvement, focusing on specific areas like performance, readability, or security.
+The `review_code` tool provides detailed code quality assessments with actionable suggestions for improvement, focusing on specific areas like performance, readability, or security.
 
 ### 6. Intelligent Code Search
 
@@ -51,15 +49,15 @@ The `search_codebase` tool allows you to search and analyze code across multiple
 
 ### 7. Audience-Targeted Code Explanations
 
-The `explain_code_for_audience` tool provides code explanations tailored to different audiences (developers, managers, beginners) with customizable detail levels.
+The `describe_codebase` tool provides code explanations tailored to different audiences (developers, managers, beginners) with customizable detail levels.
 
 ### 8. Code Migration and Modernization
 
-The `migrate_code` tool helps you migrate code between different language versions or frameworks, with explanations of the changes made.
+Functionality for code migration and modernization can be achieved using `code_generate` with appropriate descriptions.
 
 ### 9. Template-Based Code Generation
 
-The `generate_from_template` tool enables code generation using customizable templates, increasing productivity for common tasks.
+The `code_generate` tool, when provided a `template_name` and `parameters`, enables code generation using customizable templates, increasing productivity for common tasks.
 
 ## Installation
 
@@ -163,60 +161,31 @@ CodexMCP provides the following AI-powered tools:
 
 #### Core Tools
 
-1. **generate_code**: Generate code in any programming language
-   - `description`: Task description
-   - `language`: Programming language (default: "Python")
-   - `model`: OpenAI model to use (default: "o4-mini")
+1.  **`search_codebase`**: Search and analyze code across multiple files based on natural language query.
+    - `query`: Natural language search query.
+    - `file_patterns`: (Optional) File patterns to include in search (default: `["*.py", "*.js", "*.ts"]`).
+    - `max_results`: (Optional) Maximum number of results to return (default: 5).
 
-2. **assess_code**: Evaluate and improve existing code
-   - `code`: Optional source code to assess (if omitted, analyzes workspace)
-   - `language`: Programming language (default: "Python")
-   - `focus_areas`: Optional list of areas to focus on
-   - `extra_prompt`: Optional free-form instructions
-   - `model`: OpenAI model to use (default: "o4-mini")
+2.  **`code_generate`**: Unified entry point for all code-generation tasks.
+    - `description`: Task description.
+    - `language`: (Optional) Programming language (default: "Python").
+    - `template_name`: (Optional) Name of the template to use.
+    - `parameters`: (Optional) Dictionary of parameters to fill in the template.
+    - `feedback`: (Optional) Feedback on previous iterations.
+    - `iteration`: (Optional) Current iteration number (default: 1).
 
-3. **explain**: Provide context-aware code explanations
-   - First argument: Optional code snippet or file path
-   - `audience`: Target audience (default: "developer")
-   - `detail_level`: Level of detail (default: "medium")
-   - `model`: OpenAI model to use (default: "o4-mini")
+3.  **`describe_codebase`**: Explain the repository, a file, or a code snippet.
+    - `subject`: (Optional) Code snippet, file path, or concept to explain. If omitted, describes the current repository.
+    - `audience`: (Optional) Target audience (default: "developer").
+    - `detail_level`: (Optional) Level of detail (e.g., "brief", "medium", "detailed", default: "medium").
 
-4. **write_tests**: Generate unit tests
-   - `code`: Optional source code to test (if omitted, analyzes workspace)
-   - `description`: Additional testing requirements
-   - `model`: OpenAI model to use (default: "o4-mini")
+4.  **`review_code`**: Assess code quality, security, style or other aspects.
+    - `code`: (Optional) Source code to assess. If omitted, the CLI might analyze the workspace based on the prompt.
+    - `language`: (Optional) Programming language (default: "Python").
+    - `focus_areas`: (Optional) List of areas to focus on (e.g., "security", "performance").
+    - `extra_prompt`: (Optional) Free-form instructions to guide the review.
 
-5. **migrate_code**: Migrate code between different versions or frameworks
-   - `code`: Optional source code to migrate (if omitted, analyzes workspace)
-   - `from_version`: Source version/framework (e.g., "Python 2", "React 16")
-   - `to_version`: Target version/framework (e.g., "Python 3", "React 18")
-   - `language`: Base programming language (default: "Python")
-   - `model`: OpenAI model to use (default: "o4-mini")
-
-6. **generate_docs**: Create documentation for code
-   - `code`: Optional source code to document (if omitted, analyzes workspace)
-   - `doc_format`: Output format ("docstring", "markdown", "html")
-   - `model`: OpenAI model to use (default: "o4-mini")
-
-7. **write_openai_agent**: Generate an OpenAI Agent implementation
-   - `name`: Agent name
-   - `instructions`: Agent system prompt
-   - `tool_functions`: List of tool descriptions
-   - `description`: Additional agent details
-   - `model`: OpenAI model to use (default: "o4-mini")
-
-All tools now leverage the filesystem context awareness of the Codex CLI, allowing them to work with the current project's files and directory structure even when no code is explicitly provided.
-
-### Deprecated Tools
-
-The following tools are deprecated and will be removed in a future version:
-
-1. **refactor_code**: Deprecated in favor of `assess_code_quality` and `migrate_code`
-   - For code quality improvements, use `assess_code_quality`
-   - For version/framework migrations, use `migrate_code`
-
-2. **explain_code**: Deprecated in favor of `explain_code_for_audience`
-   - Use `explain_code_for_audience` with appropriate audience and detail level parameters
+All tools leverage the filesystem context awareness of the Codex CLI when it's used, allowing them to work with the current project's files and directory structure. The `model` parameter can be passed to any tool to specify the OpenAI model to use (default: "o4-mini" or as configured).
 
 ### Example Client
 
@@ -225,58 +194,76 @@ import asyncio
 from fastmcp import MCPClient
 
 async def main():
-    client = MCPClient("http://localhost:8080")
+    # Ensure the server is running, e.g., by `python -m codexmcp.server`
+    # or the `codexmcp` command.
+    client = MCPClient("http://localhost:8080") # Default port
     
     # Generate some Python code
-    code = await client.generate_code(
-        description="Create a function to calculate Fibonacci numbers",
+    generated_code = await client.code_generate(
+        description="Create a function to calculate Fibonacci numbers recursively",
         language="Python"
     )
     print("Generated code:")
-    print(code)
+    print(generated_code)
     
-    # Assess code quality
-    quality_assessment = await client.assess_code(
-        code=code,
+    # Review the generated code
+    quality_assessment = await client.review_code(
+        code=generated_code,
         language="Python",
-        focus_areas=["performance", "readability"]
+        focus_areas=["readability", "potential bugs"],
+        extra_prompt="Consider Python best practices."
     )
     print("\nCode quality assessment:")
     print(quality_assessment)
-    
-    # Generate tests
-    tests = await client.write_tests(
-        code=code,
-        description="Include tests for edge cases like negative numbers"
-    )
-    print("\nGenerated tests:")
-    print(tests)
-    
-    # Explain code for different audiences
-    explanation = await client.explain(
-        code,
+        
+    # Describe the generated code
+    explanation = await client.describe_codebase(
+        subject=generated_code, # Can also be a file path or general concept
         audience="beginner",
         detail_level="detailed"
     )
     print("\nCode explanation for beginners:")
     print(explanation)
-    
-    # Generate documentation
-    docs = await client.generate_docs(
-        code=code,
-        doc_format="markdown"
-    )
-    print("\nMarkdown documentation:")
-    print(docs)
-    
-    # Generate an OpenAI agent
-    agent_code = await client.write_openai_agent(
-        name="MathHelper",
-        instructions="You are a helpful math assistant that helps solve mathematical problems.",
-        tool_functions=["calculate", "plot_function", "solve_equation"]
-    )
-    print("\nOpenAI Agent Implementation:")
-    print(agent_code)
+
+    # Search the codebase (assuming you have some .py files in the current dir)
+    # For this example to work well, create a dummy file like 'my_project/utils.py'
+    # with 'def helper_function(): pass' in it.
+    # Then run the server from the directory containing 'my_project'.
+    try:
+        search_results = await client.search_codebase(
+            query="helper_function",
+            file_patterns=["*.py"]
+        )
+        print("\nSearch results for 'helper_function':")
+        print(search_results)
+    except Exception as e:
+        print(f"\nError during search_codebase (ensure files exist for query): {e}")
+
+    # Example: Generate code from a template
+    # First, ensure you have a template, e.g., src/codexmcp/templates/simple_class.txt:
+    # class {class_name}:
+    #     def __init__(self, name):
+    #         self.name = name
+    #
+    #     def greet(self):
+    #         return f"Hello, {self.name}!"
+    #
+    # Note: The server needs to be able to find this template.
+    # For a packaged installation, this means the template should be in the installed package.
+    # For local development, ensure paths are correct relative to where server is run.
+    try:
+        templated_code = await client.code_generate(
+            description="Generate a simple class using a template.", # Description is still useful context
+            template_name="simple_class", # Name of the template file (without .txt)
+            parameters={"class_name": "MyGreeter"},
+            language="Python"
+        )
+        print("\nGenerated code from template 'simple_class':")
+        print(templated_code)
+    except Exception as e:
+        # This might fail if the template isn't found by the server
+        print(f"\nError generating code from template (ensure template exists and is accessible): {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -2,6 +2,16 @@ import asyncio
 from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
 import sys
+import traceback
+
+# For Python < 3.11, define a placeholder ExceptionGroup class for type checking
+if sys.version_info >= (3, 11):
+    # Python 3.11+ has built-in ExceptionGroup
+    pass
+else:
+    # Define a dummy class that will never match in isinstance checks
+    class ExceptionGroup:
+        pass
 
 # --- Configuration ---
 SERVER_HOST = "localhost"
@@ -58,15 +68,13 @@ async def main():
         return 1
     except Exception as e:
         # Unwrap ExceptionGroup if present to print sub-exceptions
-        import traceback
-
         print(f"\nAn unexpected error occurred: {e}")
         print(f"Error Type: {type(e)}")
-        if isinstance(e, ExceptionGroup):
+        # ExceptionGroup is only available in Python 3.11+
+        if sys.version_info >= (3, 11) and isinstance(e, ExceptionGroup):
             print("Encountered ExceptionGroup with sub-exceptions:")
             for idx, sub in enumerate(e.exceptions):
-                print(f"-- Sub-exception {idx}: {sub}")
-                traceback.print_exception(type(sub), sub, sub.__traceback__)
+                print(f"  {idx+1}. {type(sub).__name__}: {sub}")
         else:
             traceback.print_exception(type(e), e, e.__traceback__)
         return 1

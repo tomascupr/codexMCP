@@ -2,23 +2,18 @@
 
 from __future__ import annotations
 
-import json
 import os
-import tempfile
 import importlib.resources  # Use importlib.resources
-from typing import Dict, List, Literal
-import asyncio  # Add asyncio for subprocess
-import shutil  # Add shutil for which function
+from typing import Dict, List
 
 # ---------------------------------------------------------------------------
 # Optional OpenAI SDK import (lazy fallback when Codex CLI absent)
 # ---------------------------------------------------------------------------
 
 try:
-    # The official OpenAI Python client v1.x exposes AsyncOpenAI
-    import openai  # type: ignore
-
-    _OPENAI_SDK_AVAILABLE = True
+    # Check for OpenAI SDK availability without importing unused module
+    import importlib.util
+    _OPENAI_SDK_AVAILABLE = importlib.util.find_spec("openai") is not None
 except ImportError:  # pragma: no cover – only executed when dependency missing
     _OPENAI_SDK_AVAILABLE = False
 
@@ -80,12 +75,12 @@ def _load_prompt(name: str) -> str:
 
 async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
     """Send prompt to OpenAI API with streaming and return the completed text.
-    
+
     This is only used as a fallback when Codex CLI is not available.
     """
     if hasattr(ctx, "progress") and callable(ctx.progress):
         await ctx.progress("Using OpenAI API...")
-    
+
     content = ""
     api_params = {
         "model": model,
@@ -94,26 +89,26 @@ async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
         "max_tokens": config.default_max_tokens,
         "stream": True,
     }
-    
+
     try:
         # Get streaming response from OpenAI
         stream = client.client.chat.completions.create(**api_params)
-        
+
         # Process each chunk as it arrives
         async for chunk in stream:
             delta = getattr(chunk.choices[0], "delta", None)
             token = ""
-            
+
             if delta and hasattr(delta, "content"):
                 token = delta.content or ""
             elif hasattr(chunk.choices[0].message, "content"):
                 token = chunk.choices[0].message.content or ""
-                
+
             if token:
                 content += token
                 if hasattr(ctx, "progress") and callable(ctx.progress):
                     await ctx.progress(token)
-                    
+
         return content
     except Exception as e:
         logger.error("OpenAI API error: %s", str(e), exc_info=True)
@@ -123,23 +118,25 @@ async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
 
 async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str:
     """Send *prompt* to Codex CLI and return the completion.
-    
+
     This is the core function that all tools use to query the language model.
     It prioritizes using the Codex CLI and falls back to the OpenAI API if needed.
     """
     # Show progress to user if context supports it
     if hasattr(ctx, "progress") and callable(ctx.progress):
         await ctx.progress("Generating response...")
-    
+
     try:
         # Direct call to CLI backend
         return await _cli_run(prompt, model)
     except Exception as exc:
         # Fall back to OpenAI API if Codex CLI fails and we have API access
         if _OPENAI_SDK_AVAILABLE and os.getenv("OPENAI_API_KEY"):
-            logger.warning("Codex CLI failed (%s). Falling back to OpenAI API.", type(exc).__name__)
+            logger.warning(
+                "Codex CLI failed (%s). Falling back to OpenAI API.", type(exc).__name__
+            )
             return await _query_openai_stream(ctx, prompt, model=model)
-        
+
         # No fallback available - propagate the error
         logger.error("Generation failed: %s", exc, exc_info=True)
         error_msg = f"Failed to generate response: {str(exc)}"
@@ -174,16 +171,16 @@ async def code_generate(
     """
     model_to_use = model or config.default_model
     parameters = parameters or {}
-    
+
     try:
         # Construct the prompt based on the provided parameters
         if template_name:
             logger.info(
                 "TOOL REQUEST: code_generate with template - template=%s, language=%s",
                 template_name,
-                language
+                language,
             )
-            
+
             # Load the template
             try:
                 template_content = _load_template(template_name)
@@ -203,14 +200,14 @@ async def code_generate(
 
             # Build the prompt with template
             prompt = f"# Template: {template_name}\n# Language: {language}\n\n{formatted_template}"
-            
+
         elif feedback or iteration > 1:
             logger.info(
                 "TOOL REQUEST: code_generate with feedback - language=%s, iteration=%d",
                 language,
-                iteration
+                iteration,
             )
-            
+
             # Adjust prompt based on whether this is the first iteration or a refinement
             feedback_section = ""
             if iteration > 1 and feedback:
@@ -224,15 +221,12 @@ async def code_generate(
                 feedback_section=feedback_section,
                 iteration=iteration or 1,
             )
-            
+
         else:
             # Basic code generation
-            logger.info(
-                "TOOL REQUEST: code_generate - language=%s",
-                language
-            )
+            logger.info("TOOL REQUEST: code_generate - language=%s", language)
             prompt = f"Generate {language} code that fulfils the following description:\n{description.strip()}"
-        
+
         # Execute the prompt with Codex
         return await _query_codex(ctx, prompt, model=model_to_use)
     except Exception as e:
@@ -247,33 +241,38 @@ async def describe_codebase(
     ctx: Context,
     subject: str | None = None,
     audience: str = "developer",
-    detail_level: str = "medium", # brief, medium, detailed
+    detail_level: str = "medium",  # brief, medium, detailed
     model: str | None = None,
 ) -> str:
     """Explain the repository, a file, or a code snippet."""
     model_to_use = model or config.default_model
-    logger.info("TOOL REQUEST: describe_codebase - subject=%s, detail_level=%s", 
-                subject or "repository", detail_level)
-    
+    logger.info(
+        "TOOL REQUEST: describe_codebase - subject=%s, detail_level=%s",
+        subject or "repository",
+        detail_level,
+    )
+
     try:
         prompt_text = ""
         if subject:
             # Basic check if it might be a file path that exists
-            if os.path.isfile(subject): # Checks if it's an existing regular file
+            if os.path.isfile(subject):  # Checks if it's an existing regular file
                 try:
-                    with open(subject, "r", encoding='utf-8') as f:
+                    with open(subject, "r", encoding="utf-8") as f:
                         file_content = f.read()
                     # Limit context sent to LLM for very large files
-                    prompt_text = f"Explain the following code from file '{subject}' to a {audience} in {detail_level} detail (be concise if the code is long):\n\n{file_content[:3000]}" 
+                    prompt_text = f"Explain the following code from file '{subject}' to a {audience} in {detail_level} detail (be concise if the code is long):\n\n{file_content[:3000]}"
                 except Exception as e:
-                    logger.warning(f"Could not read file {subject} for describe_codebase: {e}")
+                    logger.warning(
+                        f"Could not read file {subject} for describe_codebase: {e}"
+                    )
                     # Fallback to treating subject as a general query/snippet
                     prompt_text = f"Explain the following code, concept, or file path '{subject}' to a {audience} in {detail_level} detail."
-            else: # Assume it's a code snippet or question if not an existing file
+            else:  # Assume it's a code snippet or question if not an existing file
                 prompt_text = f"Explain the following code or concept '{subject}' to a {audience} in {detail_level} detail."
         else:
             prompt_text = f"Describe the current repository's architecture to a {audience} in {detail_level} detail."
-            
+
         return await _query_codex(ctx, prompt_text, model=model_to_use)
     except Exception as e:
         logger.error(f"Failed in describe_codebase: {str(e)}", exc_info=True)
@@ -294,7 +293,7 @@ async def review_code(
     """Assess code quality, security, style or other aspects."""
     model_to_use = model or config.default_model
     logger.info("TOOL REQUEST: review_code - language=%s", language)
-    
+
     try:
         if code:
             if _is_probably_code(code):

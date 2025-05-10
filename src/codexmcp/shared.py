@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import os
 import sys
+from dotenv import load_dotenv
+from fastmcp import FastMCP
+from .logging_cfg import configure_logging
+from .client import LLMClient
 
 # Add project root to path early for imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) or "."
@@ -11,8 +15,6 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 # Load environment variables from .env file first
-from dotenv import load_dotenv
-
 # Try loading .env from current working directory first, then package directory
 _dotenv_paths = [
     os.path.join(os.getcwd(), ".env"),  # Current working directory
@@ -30,9 +32,6 @@ for _dotenv_path in _dotenv_paths:
 if not _env_loaded:
     print("Warning: No .env file found in current directory or project root")
 
-from fastmcp import FastMCP
-from .logging_cfg import configure_logging
-
 # Configure logging with console output based on environment variable
 console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in (
     "1",
@@ -41,8 +40,6 @@ console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in (
     "on",
 )
 logger = configure_logging(console=console_logging)
-
-# Import config
 
 # ---------------------------------------------------------------------------
 # Shared singletons
@@ -53,7 +50,10 @@ mcp = FastMCP("CodexMCP")
 logger.info("Shared MCP instance initialized.")
 
 # Patch in a compatibility helper if FastMCP lacks get_tool_schemas
-if not hasattr(mcp, "get_tool_schemas") or not callable(getattr(mcp, "get_tool_schemas", None)):
+if not hasattr(mcp, "get_tool_schemas") or not callable(
+    getattr(mcp, "get_tool_schemas", None)
+):
+
     def _get_tool_schemas() -> list[dict]:
         """Return a minimal list of tool schema dicts with at least a *name* key.
 
@@ -78,7 +78,9 @@ if not hasattr(mcp, "get_tool_schemas") or not callable(getattr(mcp, "get_tool_s
             # Lists may hold Tool objects with a ``name`` attribute
             elif isinstance(tools_attr, list):
                 for tool in tools_attr:
-                    tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", None)
+                    tool_name = getattr(tool, "name", None) or getattr(
+                        tool, "__name__", None
+                    )
                     if tool_name:
                         schemas.append({"name": tool_name})
 
@@ -89,11 +91,7 @@ if not hasattr(mcp, "get_tool_schemas") or not callable(getattr(mcp, "get_tool_s
         # If no tools found via introspection, just return our known tools
         if not schemas:
             # These are the tools we know exist in our codebase
-            known_tools = [
-                "code_generate", 
-                "describe_codebase",
-                "review_code"
-            ]
+            known_tools = ["code_generate", "describe_codebase", "review_code"]
             for name in known_tools:
                 schemas.append({"name": name})
 
@@ -103,9 +101,6 @@ if not hasattr(mcp, "get_tool_schemas") or not callable(getattr(mcp, "get_tool_s
     setattr(mcp, "get_tool_schemas", _get_tool_schemas)
 
     logger.debug("Injected fallback mcp.get_tool_schemas() helper for compatibility.")
-
-# Import components after config is initialized
-from .client import LLMClient
 
 # Pre-initialize client
 client = LLMClient()

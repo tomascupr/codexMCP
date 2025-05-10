@@ -14,36 +14,31 @@ You can enable console logging by setting the CODEXMCP_CONSOLE_LOG environment v
 
 from __future__ import annotations
 
+# --------------------------------------------------------------------------------------
+# Server script that exposes FastMCP/CodexMCP tools over JSON-RPC.
+# --------------------------------------------------------------------------------------
+
 import os
 import sys
-
-# Configure logging based on environment variable
-console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in ("1", "true", "yes", "on")
-
-# Ensure logging is configured early with console output if enabled
 from .logging_cfg import configure_logging
-logger = configure_logging(console=console_logging)
-
-# Import shared singletons
 from .shared import mcp  # MCP instance (CodexPipe no longer required)
 
-# Remove direct FastMCP and CodexPipe imports if no longer needed here
-# from fastmcp import FastMCP
-# from pipe import CodexPipe
+# Ensure early expansion of sys.path to include the package root
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) or "."
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-# Add current directory to path for reliable module discovery
-# _PROJECT_ROOT = os.path.dirname(__file__) or "."
-# sys.path.insert(0, _PROJECT_ROOT) # Moved to shared.py
+# Determine console logging from environment
+console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 
-# Remove the singleton definitions and initialization logic from here
-# ---------------------------------------------------------------------------
-# Shared singletons ...
-# ---------------------------------------------------------------------------
-# mcp = FastMCP("CodexMCP")
-# pipe: CodexPipe | None = None
-# CODEX_CMD = [...]
-# os.environ[...] = ...
-# try: ... pipe = CodexPipe(...) ... except ... # All moved to shared.py
+# Initialize logger
+logger = configure_logging(console=console_logging)
+
 
 def _ensure_event_loop_policy() -> None:
     """On Windows the *ProactorEventLoop* is mandatory for subprocess pipes."""
@@ -51,8 +46,11 @@ def _ensure_event_loop_policy() -> None:
     if os.name == "nt":
         import asyncio
 
-        if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):  # type: ignore[attr-defined]
+        if not isinstance(
+            asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy
+        ):  # type: ignore[attr-defined]
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # type: ignore[attr-defined]
+
 
 def main() -> None:
     """Main entry point for the CodexMCP server."""
@@ -64,21 +62,60 @@ def main() -> None:
         # Import tools here, which will now import mcp/pipe from shared.py
         logger.info("Importing tools module...")
         import importlib
+
         importlib.import_module(f"{__package__}.tools")
         logger.info("Tools module imported successfully.")
 
         # Log available tools
-        tool_names = [
-            "generate_code", "assess_code", "explain", "search_codebase", "write_tests", "write_openai_agent"
-        ]
-        logger.info("Available tools: %s", ", ".join(tool_names))
-        
+        tool_names = ["Error: Could not determine tool list"]  # Default
+        if hasattr(mcp, "get_tool_schemas") and callable(mcp.get_tool_schemas):
+            try:
+                schemas = mcp.get_tool_schemas()  # Assuming this is the method
+                if isinstance(schemas, list):
+                    # Ensure names are extracted correctly and filter out None or empty names
+                    valid_names = []
+                    for s in schemas:
+                        if isinstance(s, dict) and "name" in s and s["name"]:
+                            valid_names.append(s["name"])
+                    if valid_names:  # Only update if we got some valid names
+                        tool_names = valid_names
+                    elif schemas:  # Schemas list was not empty but no valid names found
+                        logger.warning(
+                            "mcp.get_tool_schemas() returned schemas, but no valid 'name' keys found in them."
+                        )
+                    else:  # Schemas list was empty
+                        logger.info("mcp.get_tool_schemas() returned an empty list.")
+                        tool_names = []  # Explicitly set to empty list of names
+                else:
+                    logger.warning(
+                        f"mcp.get_tool_schemas() did not return a list, but: {type(schemas)}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error calling mcp.get_tool_schemas(): {e}", exc_info=True
+                )
+        else:
+            logger.error(
+                "mcp object does not have a callable get_tool_schemas() method."
+            )
+
+        if (
+            not tool_names and tool_names != []
+        ):  # Handles the default error message case if it wasn't overwritten by an empty list
+            logger.warning(
+                "Tool list could not be determined. Server might not have tools registered or there's an issue fetching them."
+            )
+        elif not tool_names:  # Specifically for an empty list of tools
+            logger.info("No tools are currently registered or listed by the server.")
+        else:
+            logger.info("Available tools: %s", ", ".join(tool_names))
+
         logger.info("Server is ready to process requests.")
         logger.info("=== Starting FastMCP Server Loop ===")
-        
+
         # This starts the server and event loop
         mcp.run()
-        
+
         logger.info("=== FastMCP Server Loop Finished ===")
 
     except ImportError as e_import:
@@ -89,6 +126,7 @@ def main() -> None:
         sys.exit(1)
     finally:
         logger.info("CodexMCP server shutting down.")
+
 
 if __name__ == "__main__":
     main()

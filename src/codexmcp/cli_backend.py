@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import os
+import shutil
+from typing import Final, Optional
+
 """Thin async wrapper around the `codex` CLI binary.
 
 All FastMCP tools route through this module when generating text.  The CLI
@@ -12,14 +18,6 @@ instructed to install it explicitly.
 This keeps the rest of the codebase simple: one import and one function
 (`run`) replaces the former multi-backend logic.
 """
-
-import asyncio
-import json
-import os
-import shutil
-from typing import Final, Optional
-
-from .logging_cfg import logger
 
 __all__: Final = ["CodexCLIError", "run"]
 
@@ -60,8 +58,10 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
     cmd = [
         CODEX_PATH,
         "--json",
-        "--model", mdl,
-        "-q", prompt,
+        "--model",
+        mdl,
+        "-q",
+        prompt,
         "--approval-mode=full-auto",
         "--disable-shell",
     ]
@@ -86,22 +86,26 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
         # Get the last JSON line from output
         last_line = stdout.strip().split("\n")[-1]
         result = json.loads(last_line)
-        
+
         # Extract text from any known response format
         for key in ("completion", "text", "response", "content"):
             if key in result:
                 content = result[key]
-                
+
                 # Handle list format (seen in "content" responses)
-                if isinstance(content, list) and content and isinstance(content[0], dict):
+                if (
+                    isinstance(content, list)
+                    and content
+                    and isinstance(content[0], dict)
+                ):
                     return content[0].get("text", "").lstrip("\n")
-                
+
                 # Regular string content
                 if content:
                     return str(content).lstrip("\n")
-                    
+
         raise CodexCLIError("No completion content found in response")
-        
+
     except json.JSONDecodeError as exc:
         raise CodexCLIError("Invalid JSON response from Codex CLI") from exc
     except Exception as exc:
