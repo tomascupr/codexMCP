@@ -1,9 +1,8 @@
 """Unit tests for codexmcp pipe module."""
 
-import asyncio
 import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 from codexmcp.pipe import CodexPipe, ANSI_RE
 
@@ -75,9 +74,9 @@ class TestCodexPipe:
         """Test recv method with successful response."""
         # Skip detailed recv tests as they are challenging to properly mock
         pytest.skip("This test requires complex mocking of asyncio and threading")
-        
+
     @pytest.mark.asyncio
-    @patch("codexmcp.pipe.asyncio.wait_for") 
+    @patch("codexmcp.pipe.asyncio.wait_for")
     @patch("codexmcp.pipe.Popen")
     async def test_recv_empty_response(self, mock_popen, mock_wait_for):
         """Test recv method with empty response (terminated subprocess)."""

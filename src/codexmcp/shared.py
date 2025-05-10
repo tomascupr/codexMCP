@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import sys
-import shutil  # Import shutil
 
 # Add project root to path early for imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) or "."
@@ -16,8 +15,8 @@ from dotenv import load_dotenv
 
 # Try loading .env from current working directory first, then package directory
 _dotenv_paths = [
-    os.path.join(os.getcwd(), '.env'),  # Current working directory
-    os.path.join(_PROJECT_ROOT, '.env'),  # Project root
+    os.path.join(os.getcwd(), ".env"),  # Current working directory
+    os.path.join(_PROJECT_ROOT, ".env"),  # Project root
 ]
 
 _env_loaded = False
@@ -33,14 +32,17 @@ if not _env_loaded:
 
 from fastmcp import FastMCP
 from .logging_cfg import configure_logging
-from .pipe import CodexPipe
 
 # Configure logging with console output based on environment variable
-console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in ("1", "true", "yes", "on")
+console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 logger = configure_logging(console=console_logging)
 
 # Import config
-from .config import config
 
 # ---------------------------------------------------------------------------
 # Shared singletons
@@ -52,15 +54,11 @@ logger.info("Shared MCP instance initialized.")
 
 # Import components after config is initialized
 from .client import LLMClient
-from .prompts import prompts
 
 # Pre-initialize client
 client = LLMClient()
 logger.info("Initialized LLM client")
 
-pipe: CodexPipe | None = None
-
 # CodexPipe support removed – CLI is executed per-call in `cli_backend`.
-# Retain `pipe = None` for backward compatibility.
 
 __version__ = "0.1.5"

@@ -8,4 +8,4 @@ from .shared import __version__
 # it could be dynamically imported, or users directed to use python -m.
 # For now, we'll rely on `python -m codexmcp.server` as the primary way to run.
 
-__all__ = ["__version__"] # "main" is removed as it's not directly imported 
+__all__ = ["__version__"]  # "main" is removed as it's not directly imported

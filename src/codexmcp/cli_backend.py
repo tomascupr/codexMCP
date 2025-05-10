@@ -79,8 +79,8 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
     )
 
     stdout_bytes, stderr_bytes = await proc.communicate()
-    stdout = stdout_bytes.decode('utf-8', errors='ignore')
-    stderr = stderr_bytes.decode('utf-8', errors='ignore')
+    stdout = stdout_bytes.decode("utf-8", errors="ignore")
+    stderr = stderr_bytes.decode("utf-8", errors="ignore")
 
     if proc.returncode != 0:
         raise CodexCLIError(stderr.strip() or "Codex CLI exited with non-zero status")
@@ -102,7 +102,9 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
             if key == "content" and isinstance(payload[key], list):
                 # content may be list[ {text: "..."} ]
                 first = payload[key][0]
-                return (first.get("text", "") if isinstance(first, dict) else str(first)).lstrip("\n")
+                return (
+                    first.get("text", "") if isinstance(first, dict) else str(first)
+                ).lstrip("\n")
             return str(payload[key]).lstrip("\n")
 
-    raise CodexCLIError("Codex CLI JSON did not contain a completion field") 
+    raise CodexCLIError("Codex CLI JSON did not contain a completion field")

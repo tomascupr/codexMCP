@@ -1,7 +1,5 @@
 """Unit tests for codexmcp server module."""
 
-import os
-import sys
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -17,8 +15,10 @@ class TestEventLoopPolicy:
     def test_ensure_policy_windows(self, mock_set_policy, mock_get_policy):
         """Test event loop policy configuration on Windows."""
         import asyncio
+
         class DummyPolicy:
             pass
+
         asyncio.WindowsProactorEventLoopPolicy = DummyPolicy
         mock_get_policy.return_value = object()
         _ensure_event_loop_policy()
@@ -56,7 +56,9 @@ class TestMain:
             "Shared CodexPipe failed to initialize. Server cannot start."
         )
 
-    @patch("codexmcp.server.pipe", MagicMock())  # Mock pipe to skip initialization check
+    @patch(
+        "codexmcp.server.pipe", MagicMock()
+    )  # Mock pipe to skip initialization check
     def test_main_success(self):
         """Test main function proceeds to server run and exits on error."""
         with pytest.raises(SystemExit):
@@ -67,7 +69,9 @@ class TestMain:
     @patch("codexmcp.server.pipe", MagicMock())  # Mock pipe
     @patch("importlib.import_module")
     @patch("sys.exit")
-    def test_main_import_error(self, mock_exit, mock_import_module, mock_logger, mock_ensure_policy):
+    def test_main_import_error(
+        self, mock_exit, mock_import_module, mock_logger, mock_ensure_policy
+    ):
         """Test main function with import error."""
         mock_import_module.side_effect = ImportError("fail import")
         main()

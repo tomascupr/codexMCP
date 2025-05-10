@@ -1,8 +1,7 @@
 """Tests for the OpenAI-SDK fallback path in `_query_codex`."""
 
-import os
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -27,7 +26,9 @@ async def test_openai_fallback(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     # 4. Stub the OpenAI Async client
-    fake_resp = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="Hello"))])
+    fake_resp = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Hello"))]
+    )
 
     async_client_mock = MagicMock()
     async_client_mock.chat.completions.create = AsyncMock(return_value=fake_resp)
