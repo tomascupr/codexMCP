@@ -1,6 +1,7 @@
 """Unit tests for codexmcp server module."""
 
 import pytest
+import os
 from unittest.mock import MagicMock, patch
 
 from codexmcp.server import _ensure_event_loop_policy, main
@@ -46,27 +47,26 @@ class TestMain:
 
     @patch("codexmcp.server._ensure_event_loop_policy")
     @patch("codexmcp.server.logger")
-    @patch("codexmcp.server.pipe", None)  # Simulate missing pipe
-    def test_main_no_pipe(self, mock_logger, mock_ensure_policy):
-        """Test main function with missing pipe."""
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-        assert exc_info.value.code == 1
-        mock_logger.error.assert_called_once_with(
-            "Shared CodexPipe failed to initialize. Server cannot start."
-        )
-
-    @patch(
-        "codexmcp.server.pipe", MagicMock()
-    )  # Mock pipe to skip initialization check
-    def test_main_success(self):
-        """Test main function proceeds to server run and exits on error."""
+    @patch("codexmcp.server.mcp")  # Mock MCP instance
+    @patch("importlib.import_module")
+    @patch("os.getpid")
+    def test_main_initialization(self, mock_getpid, mock_import_module, mock_mcp, mock_logger, mock_ensure_policy):
+        """Test main function initialization."""
+        # Setup - make sure mcp.run raises an exception that will be caught
+        mock_mcp.run.side_effect = Exception("Test exit")
+        mock_getpid.return_value = 12345
+        
+        # Call with expected SystemExit
         with pytest.raises(SystemExit):
             main()
+            
+        # Verify initialization sequence
+        mock_ensure_policy.assert_called_once()
+        mock_logger.info.assert_any_call("=== CodexMCP Server (v0.1.6) Starting === PID=%s ===", 12345)
+        mock_import_module.assert_called_once()
 
     @patch("codexmcp.server._ensure_event_loop_policy")
     @patch("codexmcp.server.logger")
-    @patch("codexmcp.server.pipe", MagicMock())  # Mock pipe
     @patch("importlib.import_module")
     @patch("sys.exit")
     def test_main_import_error(

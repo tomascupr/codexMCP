@@ -13,6 +13,7 @@ else:
     class ExceptionGroup:
         pass
 
+
 # --- Configuration ---
 SERVER_HOST = "localhost"
 SERVER_PORT = 5555  # Default FastMCP port, adjust if needed
@@ -74,7 +75,7 @@ async def main():
         if sys.version_info >= (3, 11) and isinstance(e, ExceptionGroup):
             print("Encountered ExceptionGroup with sub-exceptions:")
             for idx, sub in enumerate(e.exceptions):
-                print(f"  {idx+1}. {type(sub).__name__}: {sub}")
+                print(f"  {idx + 1}. {type(sub).__name__}: {sub}")
         else:
             traceback.print_exception(type(e), e, e.__traceback__)
         return 1

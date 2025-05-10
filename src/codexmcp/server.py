@@ -55,7 +55,7 @@ def _ensure_event_loop_policy() -> None:
 def main() -> None:
     """Main entry point for the CodexMCP server."""
     _ensure_event_loop_policy()
-    logger.info("=== CodexMCP Server (v0.1.5) Starting === PID=%s ===", os.getpid())
+    logger.info("=== CodexMCP Server (v0.1.6) Starting === PID=%s ===", os.getpid())
     logger.info("Console logging is %s", "ENABLED" if console_logging else "DISABLED")
 
     try:

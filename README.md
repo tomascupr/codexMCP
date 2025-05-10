@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/codexmcp.svg)](https://badge.fury.io/py/codexmcp)
 [![GitHub release](https://img.shields.io/github/v/release/tomascupr/codexMCP)](https://github.com/tomascupr/codexMCP/releases)
 
-Current version: **0.1.5**
+Current version: **0.1.6**
 
 ## What is CodexMCP?
 
@@ -29,11 +29,10 @@ The tools API has been reorganized for clarity and ease of use, with a focus on 
 - `code_generate`: Unified entry point for all code-generation tasks.
 - `review_code`: Assess code quality, security, style or other aspects.
 - `describe_codebase`: Explain the repository, a file, or a code snippet.
-- `search_codebase`: Search and analyze code across multiple files based on natural language query.
 
 ### 3. Context-Aware Code Analysis
 
-The `describe_codebase` tool (when provided a file path) and `search_codebase` tool allow you to analyze code with awareness of its surrounding context.
+The `describe_codebase` tool (when provided a file path) allows you to analyze code with awareness of its surrounding context.
 
 ### 4. Interactive Code Generation with Feedback Loop
 
@@ -43,19 +42,15 @@ The `code_generate` tool, when provided with feedback or an iteration count, ena
 
 The `review_code` tool provides detailed code quality assessments with actionable suggestions for improvement, focusing on specific areas like performance, readability, or security.
 
-### 6. Intelligent Code Search
-
-The `search_codebase` tool allows you to search and analyze code across multiple files using natural language queries, making it easier to navigate large codebases.
-
-### 7. Audience-Targeted Code Explanations
+### 6. Audience-Targeted Code Explanations
 
 The `describe_codebase` tool provides code explanations tailored to different audiences (developers, managers, beginners) with customizable detail levels.
 
-### 8. Code Migration and Modernization
+### 7. Code Migration and Modernization
 
 Functionality for code migration and modernization can be achieved using `code_generate` with appropriate descriptions.
 
-### 9. Template-Based Code Generation
+### 8. Template-Based Code Generation
 
 The `code_generate` tool, when provided a `template_name` and `parameters`, enables code generation using customizable templates, increasing productivity for common tasks.
 
@@ -142,7 +137,7 @@ If you're developing or extending CodexMCP, be aware of these implementation det
 
 2. **o4-mini Model Support**: The system has special handling for the `o4-mini` model, including proper configuration of `max_completion_tokens` and temperature settings (temperature is always set to 1.0 for o4-mini).
 
-3. **CLI Integration**: As of version 0.1.5, CodexMCP now uses a dedicated `cli_backend` module for all Codex CLI interactions, executed per-call rather than through a long-lived pipe. This improves reliability and simplifies the architecture.
+3. **CLI Integration**: As of version 0.1.6, CodexMCP now uses a dedicated `cli_backend` module for all Codex CLI interactions, executed per-call rather than through a long-lived pipe. This improves reliability and simplifies the architecture.
 
 4. **Custom Templates**: To add custom templates, place them in `src/codexmcp/templates/` with a `.txt` extension. Templates use Python's standard string formatting with named placeholders like `{parameter_name}`.
 
@@ -161,12 +156,7 @@ CodexMCP provides the following AI-powered tools:
 
 #### Core Tools
 
-1.  **`search_codebase`**: Search and analyze code across multiple files based on natural language query.
-    - `query`: Natural language search query.
-    - `file_patterns`: (Optional) File patterns to include in search (default: `["*.py", "*.js", "*.ts"]`).
-    - `max_results`: (Optional) Maximum number of results to return (default: 5).
-
-2.  **`code_generate`**: Unified entry point for all code-generation tasks.
+1.  **`code_generate`**: Unified entry point for all code-generation tasks.
     - `description`: Task description.
     - `language`: (Optional) Programming language (default: "Python").
     - `template_name`: (Optional) Name of the template to use.
@@ -174,12 +164,12 @@ CodexMCP provides the following AI-powered tools:
     - `feedback`: (Optional) Feedback on previous iterations.
     - `iteration`: (Optional) Current iteration number (default: 1).
 
-3.  **`describe_codebase`**: Explain the repository, a file, or a code snippet.
+2.  **`describe_codebase`**: Explain the repository, a file, or a code snippet.
     - `subject`: (Optional) Code snippet, file path, or concept to explain. If omitted, describes the current repository.
     - `audience`: (Optional) Target audience (default: "developer").
     - `detail_level`: (Optional) Level of detail (e.g., "brief", "medium", "detailed", default: "medium").
 
-4.  **`review_code`**: Assess code quality, security, style or other aspects.
+3.  **`review_code`**: Assess code quality, security, style or other aspects.
     - `code`: (Optional) Source code to assess. If omitted, the CLI might analyze the workspace based on the prompt.
     - `language`: (Optional) Programming language (default: "Python").
     - `focus_areas`: (Optional) List of areas to focus on (e.g., "security", "performance").
@@ -224,20 +214,6 @@ async def main():
     )
     print("\nCode explanation for beginners:")
     print(explanation)
-
-    # Search the codebase (assuming you have some .py files in the current dir)
-    # For this example to work well, create a dummy file like 'my_project/utils.py'
-    # with 'def helper_function(): pass' in it.
-    # Then run the server from the directory containing 'my_project'.
-    try:
-        search_results = await client.search_codebase(
-            query="helper_function",
-            file_patterns=["*.py"]
-        )
-        print("\nSearch results for 'helper_function':")
-        print(search_results)
-    except Exception as e:
-        print(f"\nError during search_codebase (ensure files exist for query): {e}")
 
     # Example: Generate code from a template
     # First, ensure you have a template, e.g., src/codexmcp/templates/simple_class.txt:

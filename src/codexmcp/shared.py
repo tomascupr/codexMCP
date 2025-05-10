@@ -108,4 +108,4 @@ logger.info("Initialized LLM client")
 
 # CodexPipe support removed – CLI is executed per-call in `cli_backend`.
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"

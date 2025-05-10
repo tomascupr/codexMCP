@@ -13,6 +13,7 @@ from typing import Dict, List
 try:
     # Check for OpenAI SDK availability without importing unused module
     import importlib.util
+
     _OPENAI_SDK_AVAILABLE = importlib.util.find_spec("openai") is not None
 except ImportError:  # pragma: no cover – only executed when dependency missing
     _OPENAI_SDK_AVAILABLE = False
