@@ -79,9 +79,13 @@ def _load_prompt(name: str) -> str:
 
 
 async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
-    """Send *prompt* to OpenAI API with streaming and send tokens via ctx.progress."""
+    """Send prompt to OpenAI API with streaming and return the completed text.
+    
+    This is only used as a fallback when Codex CLI is not available.
+    """
     if hasattr(ctx, "progress") and callable(ctx.progress):
-        await ctx.progress("Generating with OpenAI (streaming)…")
+        await ctx.progress("Using OpenAI API...")
+    
     content = ""
     api_params = {
         "model": model,
@@ -90,59 +94,56 @@ async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
         "max_tokens": config.default_max_tokens,
         "stream": True,
     }
+    
     try:
-        openai_client = client.client
-        stream = openai_client.chat.completions.create(**api_params)
+        # Get streaming response from OpenAI
+        stream = client.client.chat.completions.create(**api_params)
+        
+        # Process each chunk as it arrives
         async for chunk in stream:
             delta = getattr(chunk.choices[0], "delta", None)
+            token = ""
+            
             if delta and hasattr(delta, "content"):
                 token = delta.content or ""
-            else:
-                token = getattr(chunk.choices[0].message, "content", "") or ""
+            elif hasattr(chunk.choices[0].message, "content"):
+                token = chunk.choices[0].message.content or ""
+                
             if token:
                 content += token
                 if hasattr(ctx, "progress") and callable(ctx.progress):
                     await ctx.progress(token)
+                    
         return content
     except Exception as e:
-        logger.error("OpenAI streaming error: %s", str(e), exc_info=True)
-        if hasattr(ctx, "progress") and callable(ctx.progress):
-            await ctx.progress("Streaming failed, falling back to normal response…")
+        logger.error("OpenAI API error: %s", str(e), exc_info=True)
+        # Try non-streaming as last resort
         return await client.generate(prompt, model=model)
 
 
 async def _query_codex(ctx: Context, prompt: str, *, model: str) -> str:
     """Send *prompt* to Codex CLI and return the completion.
-
-    All FastMCP tools now delegate to Codex CLI exclusively so we keep this
-    helper very thin: forward the call and adapt progress/error reporting.
+    
+    This is the core function that all tools use to query the language model.
+    It prioritizes using the Codex CLI and falls back to the OpenAI API if needed.
     """
-
-    # Always prefer Codex CLI when available; fall back to OpenAI only if the
-    # CLI is missing or errors out.
-
-    # Optional user-visible progress
-    if hasattr(ctx, "progress"):
-        await ctx.progress("Generating with Codex CLI…")
-
+    # Show progress to user if context supports it
+    if hasattr(ctx, "progress") and callable(ctx.progress):
+        await ctx.progress("Generating response...")
+    
     try:
-        logger.info(
-            "Running Codex CLI with prompt: %s", prompt.replace("\n", " ")[:120]
-        )
+        # Direct call to CLI backend
         return await _cli_run(prompt, model)
     except Exception as exc:
-        logger.warning(
-            "Codex CLI path failed (%s). Checking OpenAI fallback…", type(exc).__name__
-        )
-        # If we have OpenAI creds we can still satisfy the request.
+        # Fall back to OpenAI API if Codex CLI fails and we have API access
         if _OPENAI_SDK_AVAILABLE and os.getenv("OPENAI_API_KEY"):
-            logger.info("Falling back to OpenAI ChatCompletion streaming")
+            logger.warning("Codex CLI failed (%s). Falling back to OpenAI API.", type(exc).__name__)
             return await _query_openai_stream(ctx, prompt, model=model)
-
-        logger.error(
-            "Codex CLI failed and no OpenAI fallback available: %s", exc, exc_info=True
-        )
-        raise CodexBaseError(str(exc), "cli_error") from exc
+        
+        # No fallback available - propagate the error
+        logger.error("Generation failed: %s", exc, exc_info=True)
+        error_msg = f"Failed to generate response: {str(exc)}"
+        raise CodexBaseError(error_msg, "generation_error") from exc
 
 
 @mcp.tool()
