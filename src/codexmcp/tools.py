@@ -28,7 +28,7 @@ from .exceptions import (
 from .logging_cfg import logger
 from .shared import mcp, client  # Import MCP and shared client for OpenAI streaming
 from .prompts import prompts
-from .cli_backend import run as _cli_run
+from .cli_backend import run as _cli_run, is_cli_available
 
 
 # Helper to load templates
@@ -107,11 +107,9 @@ async def _query_openai_stream(ctx: Context, prompt: str, *, model: str) -> str:
 
             if token:
                 content += token
-                # Both report progress to context and print to console
+                # Report progress to context only - no stdout pollution for MCP compliance
                 if hasattr(ctx, "progress") and callable(ctx.progress):
                     await ctx.progress(token)
-                # Also print directly to console for real-time feedback
-                print(token, end="", flush=True)
 
         return content
     except Exception as e:

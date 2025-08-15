@@ -145,8 +145,7 @@ class LLMClient:
 
                 if token:
                     content += token
-                    # Print token to console for real-time feedback
-                    print(token, end="", flush=True)
+                    # No console output - MCP servers must not pollute stdout
 
             return content.lstrip("\n")
 

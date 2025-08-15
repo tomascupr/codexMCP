@@ -108,7 +108,7 @@ The `code_generate` tool, when provided a `template_name` and `parameters`, enab
    - Optional environment variables:
      - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "o4-mini").
      - `CODEXMCP_LOG_LEVEL`: Logging level (default: INFO).
-     - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: true).
+     - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: false for MCP compliance).
      - `CODEXMCP_CACHE_ENABLED`: Enable response caching (default: true).
      - `CODEXMCP_CACHE_TTL`: Cache time-to-live in seconds (default: 3600).
      - `CODEXMCP_MAX_RETRIES`: Maximum retry attempts for API calls (default: 3).

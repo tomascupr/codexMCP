@@ -18,30 +18,32 @@ class TestQueryCodex:
     """Tests for the internal _query_codex function using the CLI backend."""
 
     @pytest.mark.asyncio
-    @patch("codexmcp.tools.cli_backend.query_cli", new_callable=AsyncMock)
-    async def test_query_codex_success_cli(self, mock_query_cli):
+    @patch("codexmcp.tools._cli_run", new_callable=AsyncMock)
+    async def test_query_codex_success_cli(self, mock_cli_run):
         """Test that _query_codex uses the CLI backend."""
-        mock_query_cli.return_value = "cli response"
+        mock_cli_run.return_value = "cli response"
         mock_ctx = MagicMock(spec=Context)
         mock_ctx.progress = AsyncMock()
 
-        result = await _query_codex(mock_ctx, "test prompt", model="o4-mini")
+        result = await _query_codex(mock_ctx, "test prompt", model="gpt-4o-mini")
 
-        mock_query_cli.assert_awaited_once()
+        mock_cli_run.assert_awaited_once()
         assert result == "cli response"
 
     @pytest.mark.asyncio
-    @patch("codexmcp.tools.cli_backend.query_cli", side_effect=Exception("CLI error"))
-    @patch("codexmcp.tools.shared.client.generate", new_callable=AsyncMock)
-    async def test_query_codex_api_fallback(self, mock_generate, mock_query_cli):
+    @patch("codexmcp.tools._cli_run", side_effect=Exception("CLI error"))
+    @patch("codexmcp.tools._OPENAI_SDK_AVAILABLE", True)
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"})
+    @patch("codexmcp.tools._query_openai_stream", new_callable=AsyncMock)
+    async def test_query_codex_api_fallback(self, mock_query_openai):
         """Test that _query_codex falls back to the API when CLI errors."""
-        mock_generate.return_value = "api response"
+        mock_query_openai.return_value = "api response"
         mock_ctx = MagicMock(spec=Context)
         mock_ctx.progress = AsyncMock()
 
         result = await _query_codex(mock_ctx, "test prompt", model="gpt-4")
 
-        mock_generate.assert_awaited_once()
+        mock_query_openai.assert_awaited_once()
         assert result == "api response"
 
 
