@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import shutil
+import threading
 from typing import Final, Optional
 
 """Thin async wrapper around the `codex` CLI binary.
@@ -12,14 +13,11 @@ All FastMCP tools route through this module when generating text.  The CLI
 has the advantage of automatic local-filesystem context and interactive chain
 of thought, so we prefer it over direct OpenAI SDK calls.
 
-If the binary cannot be located we fail fast at **import time** so the user is
-instructed to install it explicitly.
-
-This keeps the rest of the codebase simple: one import and one function
-(`run`) replaces the former multi-backend logic.
+If the binary cannot be located, we gracefully fall back to the OpenAI API
+at runtime instead of failing at import time.
 """
 
-__all__: Final = ["CodexCLIError", "run"]
+__all__: Final = ["CodexCLIError", "run", "is_cli_available"]
 
 
 class CodexCLIError(RuntimeError):
@@ -27,15 +25,37 @@ class CodexCLIError(RuntimeError):
 
 
 # --------------------------------------------------------------------------------------
-# Locate the binary once — fail fast if missing.
+# Thread-safe lazy CLI detection - check at runtime, not import time
 # --------------------------------------------------------------------------------------
-CODEX_PATH: Final = os.getenv("CODEX_PATH") or shutil.which("codex")
-if not CODEX_PATH:
-    raise CodexCLIError(
-        "Codex CLI binary not found in PATH. Install with `npm i -g @openai/codex` ― "
-        "see https://github.com/openai/codex#usage for details."
-    )
+_CODEX_PATH_CACHE: Optional[str] = None
+_CLI_CHECKED: bool = False
+_CLI_LOCK = threading.Lock()
 
+
+def _get_codex_path() -> Optional[str]:
+    """Get the Codex CLI path, checking only once and caching the result (thread-safe)."""
+    global _CODEX_PATH_CACHE, _CLI_CHECKED
+    
+    # Fast path - if already checked, return cached result
+    if _CLI_CHECKED:
+        return _CODEX_PATH_CACHE
+    
+    # Slow path - need to check, use lock for thread safety
+    with _CLI_LOCK:
+        # Double-check pattern - another thread might have set it
+        if not _CLI_CHECKED:
+            _CODEX_PATH_CACHE = os.getenv("CODEX_PATH") or shutil.which("codex")
+            _CLI_CHECKED = True
+    
+    return _CODEX_PATH_CACHE
+
+
+def is_cli_available() -> bool:
+    """Check if the Codex CLI is available without raising an error."""
+    return _get_codex_path() is not None
+
+
+# Use consistent model naming - align with config.py
 DEFAULT_MODEL: Final = os.getenv("CODEX_MODEL", "gpt-4o-mini")
 
 
@@ -53,10 +73,23 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
     -------
     str
         The completion text from Codex.
+        
+    Raises
+    ------
+    CodexCLIError
+        If the CLI is not available or execution fails.
     """
+    # Check CLI availability at runtime
+    codex_path = _get_codex_path()
+    if not codex_path:
+        raise CodexCLIError(
+            "Codex CLI binary not found in PATH. Install with `npm i -g @openai/codex` ― "
+            "see https://github.com/openai/codex#usage for details."
+        )
+    
     mdl = model or DEFAULT_MODEL
     cmd = [
-        CODEX_PATH,
+        codex_path,
         "--json",
         "--model",
         mdl,

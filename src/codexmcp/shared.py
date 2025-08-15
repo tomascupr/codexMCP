@@ -25,15 +25,13 @@ _env_loaded = False
 for _dotenv_path in _dotenv_paths:
     if os.path.exists(_dotenv_path):
         load_dotenv(dotenv_path=_dotenv_path)
-        print(f"Loaded .env file from: {_dotenv_path}")
+        # Use logger instead of print to avoid stdout pollution
         _env_loaded = True
         break
 
-if not _env_loaded:
-    print("Warning: No .env file found in current directory or project root")
-
 # Configure logging with console output based on environment variable
-console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in (
+# Default to DISABLED for MCP compliance (stdout must be clean for JSON-RPC)
+console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "0").lower() in (
     "1",
     "true",
     "yes",

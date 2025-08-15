@@ -29,7 +29,8 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 # Determine console logging from environment
-console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "1").lower() in (
+# Default to DISABLED for MCP compliance (stdout must be clean for JSON-RPC)
+console_logging = os.environ.get("CODEXMCP_CONSOLE_LOG", "0").lower() in (
     "1",
     "true",
     "yes",
