@@ -106,7 +106,7 @@ The `code_generate` tool, when provided a `template_name` and `parameters`, enab
      OPENAI_API_KEY=sk-your-key-here
      ```
    - Optional environment variables:
-     - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "o4-mini").
+     - `CODEXMCP_DEFAULT_MODEL`: Default model to use (default: "gpt-4o-mini").
      - `CODEXMCP_LOG_LEVEL`: Logging level (default: INFO).
      - `CODEXMCP_CONSOLE_LOG`: Enable console logging (default: false for MCP compliance).
      - `CODEXMCP_CACHE_ENABLED`: Enable response caching (default: true).

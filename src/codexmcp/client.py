@@ -94,10 +94,11 @@ class LLMClient:
             raise ValueError("OpenAI client not initialized")
 
         # Convert CodexMCP parameters to OpenAI parameters
-        model = params.get("model", "gpt-4o")
+        # Default to gpt-4o-mini for consistency with config.py and cli_backend.py
+        model = params.get("model", "gpt-4o-mini")
 
-        # Model-specific parameter adjustments
-        if model == "o4-mini":
+        # Model-specific parameter adjustments (handle both o4-mini and o1-mini variants)
+        if model in ("o4-mini", "o1-mini", "gpt-4o-mini"):
             temp = 1.0  # o4-mini requires temperature to be 1.0
             max_completion_tokens_val = params.get(
                 "max_tokens", 4096
@@ -115,13 +116,11 @@ class LLMClient:
             "stream": True,  # Enable streaming for all requests
         }
 
-        # Adapt max_tokens to max_completion_tokens (already handled for o4-mini case indirectly)
+        # Adapt max_tokens to max_completion_tokens
         # This logic can be refined if more models have different needs for max_tokens vs max_completion_tokens
         if "max_tokens" in params:  # Use provided max_tokens if available
             api_params["max_completion_tokens"] = params["max_tokens"]
-        elif (
-            model == "o4-mini"
-        ):  # Ensure o4-mini gets its specific default/value if not in params
+        elif model in ("o4-mini", "o1-mini", "gpt-4o-mini"):  # These models need explicit max_completion_tokens
             api_params["max_completion_tokens"] = (
                 max_completion_tokens_val  # Already set above
             )

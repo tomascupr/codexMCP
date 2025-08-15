@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import shutil
+import threading
 from typing import Final, Optional
 
 """Thin async wrapper around the `codex` CLI binary.
@@ -24,19 +25,27 @@ class CodexCLIError(RuntimeError):
 
 
 # --------------------------------------------------------------------------------------
-# Lazy CLI detection - check at runtime, not import time
+# Thread-safe lazy CLI detection - check at runtime, not import time
 # --------------------------------------------------------------------------------------
 _CODEX_PATH_CACHE: Optional[str] = None
 _CLI_CHECKED: bool = False
+_CLI_LOCK = threading.Lock()
 
 
 def _get_codex_path() -> Optional[str]:
-    """Get the Codex CLI path, checking only once and caching the result."""
+    """Get the Codex CLI path, checking only once and caching the result (thread-safe)."""
     global _CODEX_PATH_CACHE, _CLI_CHECKED
     
-    if not _CLI_CHECKED:
-        _CLI_CHECKED = True
-        _CODEX_PATH_CACHE = os.getenv("CODEX_PATH") or shutil.which("codex")
+    # Fast path - if already checked, return cached result
+    if _CLI_CHECKED:
+        return _CODEX_PATH_CACHE
+    
+    # Slow path - need to check, use lock for thread safety
+    with _CLI_LOCK:
+        # Double-check pattern - another thread might have set it
+        if not _CLI_CHECKED:
+            _CODEX_PATH_CACHE = os.getenv("CODEX_PATH") or shutil.which("codex")
+            _CLI_CHECKED = True
     
     return _CODEX_PATH_CACHE
 
@@ -46,6 +55,7 @@ def is_cli_available() -> bool:
     return _get_codex_path() is not None
 
 
+# Use consistent model naming - align with config.py
 DEFAULT_MODEL: Final = os.getenv("CODEX_MODEL", "gpt-4o-mini")
 
 
@@ -74,8 +84,7 @@ async def run(prompt: str, model: Optional[str] = None) -> str:
     if not codex_path:
         raise CodexCLIError(
             "Codex CLI binary not found in PATH. Install with `npm i -g @openai/codex` ― "
-            "see https://github.com/openai/codex#usage for details. "
-            "The system will fall back to OpenAI API if available."
+            "see https://github.com/openai/codex#usage for details."
         )
     
     mdl = model or DEFAULT_MODEL

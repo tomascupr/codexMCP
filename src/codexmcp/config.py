@@ -32,8 +32,8 @@ class Config:
         self.max_retries = int(os.environ.get("CODEXMCP_MAX_RETRIES", "3"))
         self.retry_backoff = float(os.environ.get("CODEXMCP_RETRY_BACKOFF", "2.0"))
 
-        # Model settings
-        self.default_model = os.environ.get("CODEXMCP_DEFAULT_MODEL", "o4-mini")
+        # Model settings - use consistent default across all components
+        self.default_model = os.environ.get("CODEXMCP_DEFAULT_MODEL", "gpt-4o-mini")
         self.default_temperature = float(os.environ.get("CODEXMCP_DEFAULT_TEMP", "0.2"))
         self.default_max_tokens = int(
             os.environ.get("CODEXMCP_DEFAULT_MAX_TOKENS", "4096")
